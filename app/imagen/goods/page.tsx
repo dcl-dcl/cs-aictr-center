@@ -272,7 +272,7 @@ const GoodsPage: React.FC = () => {
     if (currentTab) {
       const selectedSceneData = currentTab.children.find(scene => scene.key === sceneKey);
       if (selectedSceneData && selectedSceneData.prompt) {
-        const positivePrompt = `请抠图出我提供给你的图片中的商品，保持商品原样细节，以合适的样式放置在以下描述的场景中，使他们尽可能融合得自然一些：\n${selectedSceneData.prompt}`;
+        const positivePrompt = `请抠图出我提供给你的图片中的商品，保持商品原样细节，以合适的比例样式放置在以下描述的场景中，使他们尽可能融合得自然一些：\n${selectedSceneData.prompt}`;
         setPrompt(positivePrompt);
       }
     }
