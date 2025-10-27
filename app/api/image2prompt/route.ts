@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BaseResponse } from '@/types/BaseType';
-import { GenAIGemini } from '@/lib/gemini';
-import { fileToBase64 } from '@/utils/MediaUtil';
-import { getTaskId } from '@/utils/CommonUtil';
+import { GenAIGemini } from '@/lib/gcp-clients/gemini';
+import { fileToBase64 } from '@/lib/utils/media-util';
+import { getTaskId } from '@/lib/utils/common-util';
 
 const PROJECT = process.env.GOOGLE_CLOUD_PROJECT;
 const LOCATION = process.env.GOOGLE_CLOUD_LOCATION;

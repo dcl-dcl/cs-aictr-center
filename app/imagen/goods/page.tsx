@@ -6,12 +6,13 @@ import {
   PictureOutlined, HistoryOutlined, CloudUploadOutlined,
   ThunderboltOutlined, EyeOutlined, DownloadOutlined, ReloadOutlined,
  } from '@ant-design/icons';
-import GoodsLayout from '@/components/GoodsLayout';
+import CommonLayout from '@/components/ChildrenLayout';
 import ErrorModal from '@/components/ErrorModal';
 import { ImageUpload } from '@/components/ImageUpload';
 import { downloadSingleFile, MediaType } from '@/components/MediaPreview';
 import { MediaFile } from '@/types/BaseType'
 import { AspectRatioOptions, productExamples, recommendedScenesTabs, GoodsGenImageModel } from '@/constants/GoodsData';
+import { apiFetch } from '@/lib/utils/api-client';
 
 
 const { TextArea } = Input;
@@ -206,7 +207,6 @@ const GoodsPage: React.FC = () => {
   }[]>(FakeHistoryRecords);
   const [errorStat, setErrorStat] = useState<{showError: boolean, error: string}>({showError: false, error: ''});
   const [currentExampleImages, setCurrentExampleImages] = useState(productExamples);
-  console.log(currentExampleImages)
 
   // 处理生成请求
   const handleGenerate = async () => {
@@ -229,9 +229,9 @@ const GoodsPage: React.FC = () => {
 
     //发送请求
     try {
-      const response = await fetch('/api/imagen', {
+      const response = await apiFetch('/api/imagen', {
         method: 'POST',
-        body: reqFormData,
+        data: reqFormData,
       });
         const result = await response.json();
         if (!result.success || !result?.resultData) {
@@ -256,8 +256,6 @@ const GoodsPage: React.FC = () => {
       const file = new File([blob], `${product.name}.webp`, { type: blob.type });
       // 设置到uploadedImage状态
       setUploadedImage(file);
-      // 显示成功消息
-      message.success(`已选择${product.name}作为商品图片`);
     } catch (error) {
       console.error('加载示例图片失败:', error);
       message.error('加载示例图片失败，请重试');
@@ -609,7 +607,7 @@ const GoodsPage: React.FC = () => {
 
   return (
     <>
-    <GoodsLayout
+    <CommonLayout
       leftContent={<div className="p-6">{leftContent}</div>}
       centerContent={<div className="p-6">{centerContent}</div>}
       rightContent={<div className="p-6">{rightContent}</div>}

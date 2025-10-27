@@ -1,4 +1,4 @@
-import { Imagen, ImageGenerateParameters } from '@/lib/imagen'
+import { Imagen, ImageGenerateParameters } from '@/lib/gcp-clients/imagen'
 import { helpers } from '@google-cloud/aiplatform';
 
 export type TryOnGenerateParameters = ImageGenerateParameters;

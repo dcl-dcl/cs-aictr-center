@@ -2,7 +2,7 @@
 
 import React, { ReactNode } from 'react';
 
-interface GoodsLayoutProps {
+interface CommonLayoutProps {
   // 左侧内容区域 (1.5/6)
   leftContent: ReactNode;
   leftClassName?: string;
@@ -25,7 +25,7 @@ interface GoodsLayoutProps {
   gap?: 'sm' | 'md' | 'lg';
 }
 
-const GoodsLayout: React.FC<GoodsLayoutProps> = ({
+const CommonLayout: React.FC<CommonLayoutProps> = ({
   leftContent,
   leftClassName = '',
   centerContent,
@@ -111,4 +111,4 @@ const GoodsLayout: React.FC<GoodsLayoutProps> = ({
   );
 };
 
-export default GoodsLayout;
+export default CommonLayout;

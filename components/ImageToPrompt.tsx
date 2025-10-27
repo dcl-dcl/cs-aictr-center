@@ -1,5 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
+import { apiFetch } from '@/lib/utils/api-client'
 
 interface ImageToPromptProps {
   isOpen: boolean;
@@ -88,9 +89,9 @@ export default function ImageToPrompt({ isOpen, onClose, onApplyPrompt }: ImageT
       formData.append('image', selectedImage);
       formData.append('target', 'image');
 
-      const response = await fetch('/api/image2prompt', {
+      const response = await apiFetch('/api/image2prompt', {
         method: 'POST',
-        body: formData,
+        data: formData,
       });
 
       const result = await response.json();

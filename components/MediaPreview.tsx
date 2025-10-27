@@ -1,4 +1,5 @@
 import React from 'react';
+import { apiFetch } from '@/lib/utils/api-client';
 import { MediaFile } from '@/types/BaseType'
 import { PhotoProvider, PhotoView } from 'react-photo-view';
 import 'react-photo-view/dist/react-photo-view.css';
@@ -548,12 +549,9 @@ export const downloadSingleFile = async (
         { url: media, filename: downloadFilename, mimeType } : 
         { url: media.url, filename: downloadFilename, mimeType: media.mimeType };
         
-      const response = await fetch('/api/download', {
+      const response = await apiFetch('/api/download', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody)
+        data: requestBody,
       });
       
       if (!response.ok || response.status != 200) {

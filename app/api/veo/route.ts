@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { transformParameters, getTaskId } from '@/utils/CommonUtil';
+import { transformParameters, getTaskId } from '@/lib/utils/common-util';
 import { VeoApiResponse } from '@/types/VeoType';
-import { fileToBase64 } from '@/utils/MediaUtil';
-import { GCS } from '@/lib/gcs';
-import { Veo, VeoGenerateParameters, imageData} from '@/lib/veo';
+import { fileToBase64 } from '@/lib/utils/media-util';
+import { GCS } from '@/lib/gcp-clients/gcs';
+import { Veo, VeoGenerateParameters, imageData} from '@/lib/gcp-clients/veo';
 
 
 const PROJECT = process.env.GOOGLE_CLOUD_PROJECT;

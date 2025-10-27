@@ -13,7 +13,7 @@
 ### 1. 初始化
 
 ```typescript
-import { ModelRequestHandler } from '@/utils/ModelRequestHandler';
+import { ModelRequestHandler } from '@/lib/services/model-request-handler';
 
 // 使用默认GcsService
 const requestHandler = new ModelRequestHandler();
@@ -121,7 +121,7 @@ const processedResults = await requestHandler.processModelResponse(modelResults,
 ### imagen/route.ts 示例
 
 ```typescript
-import { ModelRequestHandler } from '@/utils/ModelRequestHandler';
+import { ModelRequestHandler } from '@/lib/services/model-request-handler';
 
 const requestHandler = new ModelRequestHandler();
 
@@ -202,7 +202,7 @@ interface ResponseProcessOptions {
 import { processFileForTryOn, processFilesForModelRequest } from '@/utils/FileProcessUtil';
 
 // 新代码
-import { ModelRequestHandler } from '@/utils/ModelRequestHandler';
+import { ModelRequestHandler } from '@/lib/services/model-request-handler';
 const requestHandler = new ModelRequestHandler();
 
 // 替换函数调用

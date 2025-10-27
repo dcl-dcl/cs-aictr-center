@@ -11,7 +11,7 @@ export default function Home() {
         {/* 标题区域 */}
         <div className="text-center mb-16">
           <h1 className="text-5xl font-bold text-gray-800 mb-4">
-            CS Demo Center - <span className="text-indigo-600">AI创意平台</span>
+            Aictr Center - <span className="text-indigo-600">AI创意平台</span>
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             发现世界前沿的AI创意工具，让创意无限！

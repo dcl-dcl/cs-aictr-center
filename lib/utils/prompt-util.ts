@@ -1,5 +1,5 @@
-import { ImageStyleAttributeData } from '@/constants/ImagenData';
 import { VideoStyleAttributeData } from '@/constants/VeoData';
+import { ImageStyleAttributeData } from '@/constants/ImagenData'
 import { AttributeGroup } from '@/types/BaseType'
 
 

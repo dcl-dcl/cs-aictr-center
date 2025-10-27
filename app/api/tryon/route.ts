@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { transformParameters, getTaskId } from '@/utils/CommonUtil';
+import { transformParameters, getTaskId } from '@/lib/utils/common-util';
 import { TryOnApiResponse } from '@/types/TryonType';
 import { TryonModelList } from '@/constants/TryonData';
-import { TryOn, TryOnGenerateParameters } from '@/lib/tryon';
-import { ModelRequestHandler } from '@/utils/ModelRequestHandler';
+import { TryOn, TryOnGenerateParameters } from '@/lib/gcp-clients/tryon';
+import { ModelRequestHandler } from '@/lib/utils/model-request-handler';
 
 // 初始化通用模型请求处理器
 const requestHandler = new ModelRequestHandler();

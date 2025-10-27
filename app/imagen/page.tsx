@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react';
+import { apiFetch } from '@/lib/utils/api-client';
 import { useSearchParams } from 'next/navigation';
 import { LoadingSpinner, ImageGenerateResultIcon } from '@/components/CommonUI';
 import { MediaFile } from '@/types/BaseType'
@@ -19,7 +20,7 @@ import {
     getImagenModelConfigs, ImageStyleAttributeData, NanoBananaConfigs,
 } from '@/constants/ImagenData';
 import { AttributeGroup } from '@/types/BaseType';
-import { GenerateStylePrompt } from '@/utils/PromptUtil';
+import { GenerateStylePrompt } from '@/lib/utils/prompt-util';
 
 
 const GeminiGenerationTab = 'gemini-generation';
@@ -126,15 +127,12 @@ export default function ImagenPage () {
         setIsTranslating(true);
         
         try {
-            const response = await fetch('/api/translate', {
+            const response = await apiFetch('/api/translate', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
+                data: {
                     text: originalPrompt,
                     targetLanguage: 'en',
-                }),
+                },
             });
             
             const result = await response.json();
@@ -188,9 +186,9 @@ export default function ImagenPage () {
 
         //调用api生成图片
         try {
-            const response = await fetch('/api/imagen', {
+            const response = await apiFetch('/api/imagen', {
                 method: 'POST',
-                body: formData,
+                data: formData,
             });
             
             const result = await response.json();

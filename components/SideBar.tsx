@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Menu, Badge } from 'antd';
 import type { MenuProps } from 'antd';
 
@@ -44,14 +44,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isSimpleMode = !activeMainMenu && !onMainMenuChange && activeTab && onTabChange;
 
   // 根据活跃的子菜单找到对应的主菜单
-  const findMainMenuForSubMenu = (subMenuId: string) => {
+  const findMainMenuForSubMenu = useCallback((subMenuId: string) => {
     for (const tab of tabs) {
       if (tab.subItems?.some(subItem => subItem.id === subMenuId)) {
         return tab.id;
       }
     }
     return null;
-  };
+  }, [tabs]);
 
   // 获取当前选中的菜单项
   const selectedKeys = useMemo(() => {
@@ -86,7 +86,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
     
     return keys;
-  }, [activeMainMenu, activeSubMenu]);
+  }, [activeMainMenu, activeSubMenu, findMainMenuForSubMenu]);
 
   const [currentOpenKeys, setCurrentOpenKeys] = useState<string[]>(openKeys);
 

@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react';
+import { apiFetch } from '@/lib/utils/api-client';
 import { LoadingSpinner, VideoGenerateResultIcon } from '@/components/CommonUI';
 import { ModelSelect, initializeConfigSelections } from '@/components/Selector';
 import {
@@ -91,7 +92,7 @@ export default function VeoPage() {
                 attempts++;
                 try {
                     console.log(`开始第 ${attempts} 次轮询...`);
-                    const response = await fetch(
+                    const response = await apiFetch(
                         `/api/veo?operationName=${encodeURIComponent(operationName)}&modelName=${encodeURIComponent(modelName)}`,
                         { method: 'GET' }
                     );
@@ -175,9 +176,9 @@ export default function VeoPage() {
         setIsGenerating(true);
         try {
             // 第一步：发送POST请求创建生成任务
-            const response = await fetch('/api/veo', {
+            const response = await apiFetch('/api/veo', {
                 method: 'POST',
-                body: formData,
+                data: formData,
             });
             const taskResult = await response.json();
             if (!taskResult.success || !taskResult?.operationName) {

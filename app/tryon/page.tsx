@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react';
+import { apiFetch } from '@/lib/utils/api-client';
 import { useSearchParams } from 'next/navigation';
 import { LoadingSpinner, ImageGenerateResultIcon, UploadIcon } from '@/components/CommonUI';
 import { ModelSelect, initializeConfigSelections } from '@/components/Selector';
@@ -100,9 +101,9 @@ export default function TryOnPage() {
 
         setIsGenerating(true);
         try {
-            const response = await fetch('/api/tryon', {
+            const response = await apiFetch('/api/tryon', {
                 method: 'POST',
-                body: formData,
+                data: formData,
             });
             
             const result = await response.json();

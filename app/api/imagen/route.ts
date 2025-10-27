@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { transformParameters, getTaskId } from '@/utils/CommonUtil';
+import { transformParameters, getTaskId } from '@/lib/utils/common-util';
 import { ImagenApiResponse } from '@/types/ImageType';
 import { GeminiModelList } from '@/constants/ImagenData';
-import { Imagen, ImageGenerateParameters } from '@/lib/imagen';
-import { GenAIGemini } from '@/lib/gemini';
-import { ModelRequestHandler } from '@/utils/ModelRequestHandler';
-import { fileToBase64 } from '@/utils/MediaUtil';
+import { Imagen, ImageGenerateParameters } from '@/lib/gcp-clients/imagen';
+import { GenAIGemini } from '@/lib/gcp-clients/gemini';
+import { ModelRequestHandler } from '@/lib/utils/model-request-handler';
+import { fileToBase64 } from '@/lib/utils/media-util';
 
 const PROJECT = process.env.GOOGLE_CLOUD_PROJECT;
 const LOCATION = process.env.GOOGLE_CLOUD_LOCATION;

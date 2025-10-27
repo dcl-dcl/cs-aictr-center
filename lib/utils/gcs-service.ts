@@ -1,8 +1,7 @@
 import formidable from 'formidable';
-import { GCS } from '../lib/gcs';
+import { GCS } from '@/lib/gcp-clients/gcs';
 import fs from 'fs';
 import path from 'path';
-
 
 /**
  * 支持的文件输入类型
@@ -212,7 +211,7 @@ export class GcsService {
       // 构建目标文件路径
       const destinationBlobName = subFolder ? `${subFolder}/${fileName}` : fileName;
       const bucketName = this.gcsBucket.replace('gs://', '');
-      console.log("=============================================destinationBlobName：", destinationBlobName)
+      // 目标文件路径
       // 检查文件是否已存在
       // if (checkExists) {
       //   try {
@@ -234,7 +233,6 @@ export class GcsService {
       //     console.warn('Failed to check file existence, proceeding with upload:', error);
       //   }
       // }
-      console.log('2222222222222222222222222222222222222222222')
       // 上传文件
       await this.gcsClient.upload(bucketName, destinationBlobName, fileBuffer);
 
@@ -242,7 +240,6 @@ export class GcsService {
       const url = returnSignedUrl
         ? await this.gcsClient.generateSignedUrl(bucketName, destinationBlobName, 60 * 24)
         : "";
-      console.log('3333333333333333333333333333333333333333333')
       return {
         gcsUri: `${this.gcsBucket}/${destinationBlobName}`,
         signedUrl: url,
@@ -348,6 +345,3 @@ export class GcsService {
     return this.gcsBucket;
   }
 }
-
-
-
