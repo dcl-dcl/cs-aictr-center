@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { apiFetch } from '@/lib/utils/api-client';
 import { LoadingSpinner, VideoGenerateResultIcon } from '@/components/CommonUI';
 import { ModelSelect, initializeConfigSelections } from '@/components/Selector';
@@ -15,7 +16,13 @@ import {
     SupportFrameImageModelList,
 } from '@/constants/VeoData';
 import PageLayout from '@/components/PageLayout';
-import TaskHistory from '@/components/TaskHistory';
+// 动态导入历史记录组件，避免首次渲染阻塞
+const TaskHistory = dynamic(() => import('@/components/TaskHistory'), {
+  ssr: false,
+  loading: () => (
+    <div className="p-4 text-gray-600">历史记录加载中...</div>
+  )
+});
 import { ImageUpload } from '@/components/ImageUpload';
 
 
