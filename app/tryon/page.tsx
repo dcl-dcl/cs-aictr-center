@@ -175,15 +175,20 @@ export default function TryOnPage() {
             />
             
             {/* 示例展示区域 */}
-            <div className="mb-8 bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-                <div className="flex flex-col sm:flex-row justify-center items-center gap-8 overflow-x-auto">
+            <div className="mb-6 bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                <div className="flex flex-col sm:flex-row justify-center items-center gap-4 overflow-x-auto">
+                    {/* 模特图示例 */}
+                    <SampleImageDisplay label="模特图" imgSrc="/TryOnImages/tryon_person.png" size="sm" />
+                    <div className="hidden sm:block flex-shrink-0">
+                        <RightArrowIcon />
+                    </div>
                     {/* 产品图示例 */}
-                    <SampleImageDisplay label="产品图" imgSrc="/TryOnImages/tryon_product.png" />
+                    <SampleImageDisplay label="产品图" imgSrc="/TryOnImages/tryon_product.png" size="sm" />
                     <div className="hidden sm:block flex-shrink-0">
                         <RightArrowIcon />
                     </div>
                     {/* 试穿效果示例 */}
-                    <SampleImageDisplay label="试穿效果" imgSrc="/TryOnImages/tryon_result.png" />
+                    <SampleImageDisplay label="试穿效果" imgSrc="/TryOnImages/tryon_result.png" size="sm" />
                 </div>
                 <p className="text-center text-sm text-gray-500 mt-6 bg-gray-50 px-6 py-3 rounded-lg">
                     上传模特图和产品图片，系统会自动生成试穿效果
