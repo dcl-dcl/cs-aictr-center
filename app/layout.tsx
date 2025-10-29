@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import '@ant-design/v5-patch-for-react-19';
 import ConditionalLayout from '@/components/AppLayout';
 import "../styles/globals.css";
 

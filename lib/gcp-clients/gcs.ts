@@ -57,13 +57,13 @@ export class GCS {
      * 生成文件的签名URL
      * @param bucketName 存储桶名称
      * @param blobName 文件名称
-     * @param expirationMinutes 过期时间，单位分钟，默认24小时
+     * @param expirationMinutes 过期时间，单位分钟，默认24 * 7小时
      * @returns 签名URL
      */
     async generateSignedUrl(
         bucketName: string,
         blobName: string,
-        expirationMinutes: number = 60 * 24
+        expirationMinutes: number = 7 * 60 * 24
     ): Promise<string> {
         const blob = this.getBlob(bucketName, blobName);
         const [url] = await blob.getSignedUrl({

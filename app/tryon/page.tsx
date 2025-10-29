@@ -11,6 +11,7 @@ import {
 import { ConfigurationPanel } from '@/components/ConfigurationPanel';
 import ErrorModal from '@/components/ErrorModal';
 import PageLayout from '@/components/PageLayout';
+import TaskHistory from '@/components/TaskHistory';
 import { MediaFile } from '@/types/BaseType';
 import { 
     TryOnConfigs, ProductRecontextConfigs, 
@@ -30,19 +31,20 @@ const getCurrentConfigs = (activeTab: string) => {
 };
 
 export default function TryOnPage() {
-    const searchParams = useSearchParams();
-    const activeTab = searchParams.get('tab') || TryOnTab;
-    const [prompt, setPrompt] = useState('');
-    const [productDescription, setProductDescription] = useState('');
-    const [modelImages, setModelImages] = useState<File[]>([]);
-    const [productImages, setProductImages] = useState<File[]>([]);
-    const [generatedImages, setGeneratedImages] = useState<Array<MediaFile>>([]);
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [configSelections, setConfigSelections] = useState<Record<string, string>>(
-        initializeConfigSelections(getCurrentConfigs(activeTab))
-    );
-    const [error, setError] = useState<string | null>(null);
-    const [showError, setShowError] = useState(false);
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get('tab') || TryOnTab;
+  const [prompt, setPrompt] = useState('');
+  const [productDescription, setProductDescription] = useState('');
+  const [modelImages, setModelImages] = useState<File[]>([]);
+  const [productImages, setProductImages] = useState<File[]>([]);
+  const [generatedImages, setGeneratedImages] = useState<Array<MediaFile>>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+  const [configSelections, setConfigSelections] = useState<Record<string, string>>(
+      initializeConfigSelections(getCurrentConfigs(activeTab))
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [showError, setShowError] = useState(false);
 
     // 当activeTab变化时清空数据
     useEffect(() => {
@@ -98,6 +100,7 @@ export default function TryOnPage() {
         if (prompt) formData.append('prompt', prompt);
         if (productDescription) formData.append('productDescription', productDescription);
         formData.append('ConfigParameters', JSON.stringify(configSelections));
+        formData.append('taskFromTab', `tryon?tab=${activeTab}`);
 
         setIsGenerating(true);
         try {
@@ -112,37 +115,43 @@ export default function TryOnPage() {
             }
             setGeneratedImages(result.resultData);
 
-        } catch (error) {
-            console.error('生成试穿效果错误:', error);
-            const errorMessage = error instanceof Error ? error.message : '未知错误';
-            setError(`生成试穿效果失败：${errorMessage}`);
-            setShowError(true);
-        } finally {
-            setIsGenerating(false);
-        }
-    };
+    } catch (error) {
+      console.error('生成试穿效果错误:', error);
+      const errorMessage = error instanceof Error ? error.message : '未知错误';
+      setError(`生成试穿效果失败：${errorMessage}`);
+      setShowError(true);
+    } finally {
+      setIsGenerating(false);
+      // 无论成功或失败都刷新历史记录以展示最新任务状态
+      setHistoryRefreshKey((k) => k + 1);
+    }
+  };
 
-    const SampleImageDisplay = ({ label, imgSrc }: { label: string, imgSrc: string }) => (
-        <div className="text-center">
-            <div className="w-50 h-60 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center mb-3 p-2 hover:border-gray-400 hover:shadow-md transition-all duration-200">
-                <img
-                    src={imgSrc}
-                    alt={label}
-                    className="max-w-full max-h-full object-contain rounded-lg shadow-sm"
-                    onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = 'none';
-                        target.parentElement!.innerHTML = '<svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>';
-                    }}
-                />
+    const SampleImageDisplay = ({ label, imgSrc, size = 'md' }: { label: string, imgSrc: string, size?: 'sm' | 'md' | 'lg' }) => {
+        const sizeClasses = size === 'sm' ? 'w-36 h-48 p-3' : size === 'lg' ? 'w-56 h-72 p-5' : 'w-48 h-64 p-4';
+        const labelSize = size === 'sm' ? 'text-xs' : size === 'lg' ? 'text-base' : 'text-sm';
+        return (
+            <div className="text-center flex-shrink-0">
+                <div className={`${sizeClasses} bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center mb-3 hover:border-gray-400 hover:shadow-md transition-all duration-200 overflow-hidden`}>
+                    <img
+                        src={imgSrc}
+                        alt={label}
+                        className="max-w-full max-h-full object-contain rounded-lg shadow-sm"
+                        onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            target.parentElement!.innerHTML = '<svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>';
+                        }}
+                    />
+                </div>
+                <p className={`${labelSize} text-gray-700 font-medium`}>{label}</p>
             </div>
-            <p className="text-sm text-gray-700 font-medium">{label}</p>
-        </div>
-    );
+        );
+    };
     
-    const RightArrowIcon = () => (
+    const RightArrowIcon = ({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) => (
         <div className="text-gray-400 hover:text-gray-600 transition-colors duration-200">
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={`${size === 'sm' ? 'w-6 h-6' : size === 'lg' ? 'w-10 h-10' : 'w-8 h-8'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
         </div>
@@ -159,11 +168,11 @@ export default function TryOnPage() {
             />
             
             {/* 示例展示区域 */}
-            <div className="mb-8 bg-white rounded-xl border border-gray-200 shadow-sm p-8 min-h-[300px]">
-                <div className="flex flex-col sm:flex-row justify-center items-center space-y-6 sm:space-y-0 sm:space-x-8">
+            <div className="mb-8 bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                <div className="flex flex-col sm:flex-row justify-center items-center gap-8 overflow-x-auto">
                     {/* 产品图示例 */}
                     <SampleImageDisplay label="产品图" imgSrc="/TryOnImages/tryon_product.png" />
-                    <div className="hidden sm:block">
+                    <div className="hidden sm:block flex-shrink-0">
                         <RightArrowIcon />
                     </div>
                     {/* 试穿效果示例 */}
@@ -175,8 +184,8 @@ export default function TryOnPage() {
             </div>
 
             {/* 图片上传区域 - 并排布局 */}
-            <div className="mb-8">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="mb-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
                     {/* 模特图片上传 */}
                     <div>
                         <div className="flex items-center mb-4">
@@ -205,9 +214,10 @@ export default function TryOnPage() {
                                     showRemove={true}
                                     onRemove={(index: number) => RemoveFiles(setModelImages, index)}
                                     title=""
+                                    imageHeight="h-64"
                                     gridCols="grid-cols-1 sm:grid-cols-2"
                                     buttonSize="w-5 h-5"
-                                    className="border-2 border-gray-300 rounded-lg p-4"
+                                    className="border-2 border-gray-300 rounded-lg p-2"
                                 />
                             </div>
                         )}
@@ -242,9 +252,10 @@ export default function TryOnPage() {
                                     showRemove={true}
                                     onRemove={(index: number) => RemoveFiles(setProductImages, index)}
                                     title=""
+                                    imageHeight="h-64"
                                     gridCols="grid-cols-1 sm:grid-cols-2"
                                     buttonSize="w-5 h-5"
-                                    className="border-2 border-gray-300 rounded-lg p-4"
+                                    className="border-2 border-gray-300 rounded-lg p-2"
                                 />
                             </div>
                         )}
@@ -265,36 +276,36 @@ export default function TryOnPage() {
         />
     
         {/* 示例展示区域 */}
-        <div className="mb-8 bg-white rounded-xl border border-gray-200 shadow-sm p-8 min-h-[350px]">
-            <div className="flex flex-col sm:flex-row justify-center items-center space-y-8 sm:space-y-0 sm:space-x-10">
+        <div className="mb-6 bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+            <div className="flex flex-col sm:flex-row justify-center items-center gap-4 overflow-x-auto">
                 {/* 产品图示例 */}
-                <SampleImageDisplay label="产品图" imgSrc="/TryOnImages/recontext_product.png" />
-                <div className="hidden sm:block">
-                    <RightArrowIcon />
+                <SampleImageDisplay label="产品图" imgSrc="/TryOnImages/recontext_product.png" size="sm" />
+                <div className="hidden sm:block flex-shrink-0">
+                    <RightArrowIcon size="sm" />
                 </div>
                 {/* 提示词 */}
-                <div className="text-center">
-                    <div className="w-48 h-64 bg-blue-50 rounded-lg border border-blue-200 flex items-center justify-center mb-2 p-4 hover:border-blue-300 transition-colors">
+                <div className="text-center flex-shrink-0">
+                    <div className="w-36 h-48 bg-blue-50 rounded-xl border-2 border-dashed border-blue-200 flex items-center justify-center mb-3 p-3 hover:border-blue-300 transition-all duration-200 overflow-hidden">
                         <div className="text-center">
-                            <svg className="w-8 h-8 text-blue-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-6 h-6 text-blue-500 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
-                            <p className="text-sm font-semibold text-blue-700 mb-2">AI 提示词</p>
+                            <p className="text-xs font-semibold text-blue-700 mb-1">AI 提示词</p>
                             <p className="text-xs text-blue-600 leading-relaxed">
                                 e.g. A pair of orange sneakers worn by a trendy, well dressed woman sitting on marble steps
                             </p>
                         </div>
                     </div>
-                    <p className="text-sm text-gray-600 font-medium">提示词生成</p>
+                    <p className="text-xs text-gray-700 font-medium">提示词生成</p>
                 </div>
-                <div className="hidden sm:block">
-                    <RightArrowIcon />
+                <div className="hidden sm:block flex-shrink-0">
+                    <RightArrowIcon size="sm" />
                 </div>
                 {/* 试穿效果示例 */}
-                <SampleImageDisplay label="效果图" imgSrc="/TryOnImages/recontext_result.png" />
+                <SampleImageDisplay label="效果图" imgSrc="/TryOnImages/recontext_result.png" size="sm" />
             </div>
             
-            <p className="text-center text-sm text-gray-500 mt-8 bg-gray-50 px-6 py-3 rounded-lg">
+            <p className="text-center text-xs text-gray-500 mt-4 bg-gray-50 px-4 py-2 rounded-lg">
                 上传产品图和输入提示词，系统会自动生成试穿效果
             </p>
         </div>
@@ -326,6 +337,9 @@ export default function TryOnPage() {
                         files={productImages}
                         showRemove={true}
                         title=''
+                        imageHeight="h-64"
+                        gridCols="grid-cols-1 sm:grid-cols-2"
+                        buttonSize="w-5 h-5"
                         onRemove={(index: number) => RemoveFiles(setProductImages, index)}
                     />
                 </div>
@@ -377,7 +391,7 @@ export default function TryOnPage() {
                                 {activeTab === ProductRecontextTab && renderProductRecontextContent()}
                                 
                                 {/* 生成按钮 */}
-                                <div className="flex justify-center mb-6">
+                                <div className="flex justify-center my-6">
                                     <button
                                         onClick={handleGenerate}
                                         className={`
@@ -424,15 +438,17 @@ export default function TryOnPage() {
         </>
     );
 
-    // 右侧内容
-    const rightContent = (
+
+
+    // 中间内容 - 生成结果
+    const centerContent = (
         <>
                         <div className="flex items-center mb-6 lg:mb-8">
                             <span className="text-green-500 mr-2">●</span>
                             <span className="text-xl font-semibold text-gray-800">生成结果</span>
                         </div>
                         {generatedImages.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-64 lg:h-3/5 text-gray-400 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-200">
+                            <div className="flex flex-col items-center justify-center h-64 lg:h-3/5 text-gray-400 bg-white rounded-xl border-2 border-dashed border-gray-200">
                                 <ImageGenerateResultIcon 
                                     primaryText="试穿效果将在这里显示"
                                     secondaryText={activeTab === TryOnTab ? "请上传模特和产品图片，然后点击生成按钮开始创作" : "请上传产品图片和输入提示词，然后点击生成按钮开始创作"}
@@ -444,12 +460,12 @@ export default function TryOnPage() {
                                 urlImages={generatedImages}
                                 showRemove={false}
                                 showDownload={true}
-                                showBatchDownload={true}
+                                showBatchDownload={false}
                                 onDownload={(index, data) => downloadSingleFile(data as MediaFile)}
                                 onBatchDownload={() => downloadAllFiles(generatedImages)}
                                 title=''
-                                imageHeight='h-80'     
-                                gridCols="grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4"
+                                imageHeight='h-64'     
+                                gridCols="grid-cols-1 sm:grid-cols-2"
                                 buttonSize="w-5 h-5"
                                 className=""
                             />                
@@ -459,13 +475,31 @@ export default function TryOnPage() {
         </>
     );
 
+    // 右侧内容 - 任务历史记录
+    const rightContent = (
+        <>
+            <div className="flex items-center mb-6">
+                <span className="text-blue-500 mr-2">●</span>
+                <span className="text-xl font-semibold text-gray-800">历史记录</span>
+            </div>
+            <TaskHistory
+                path="tryon"
+                tab={activeTab}
+                page={1}
+                page_size={10}
+                className=""
+                refreshSignal={historyRefreshKey}
+            />
+        </>
+    );
+
     return (
         <>
             <PageLayout
                 leftContent={leftContent}
+                centerContent={centerContent}
                 rightContent={rightContent}
-                backgroundClassName="h-full bg-gradient-to-br from-gray-50 to-gray-100"
-                responsive={true}
+                containerClassName="h-full bg-gradient-to-br from-gray-50 to-gray-100"
             />
             
             {/* 错误提示弹窗 */}

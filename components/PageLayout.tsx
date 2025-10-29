@@ -1,103 +1,114 @@
+'use client'
+
 import React, { ReactNode } from 'react';
 
-interface PageLayoutProps {
-  // 页面背景样式
-  backgroundClassName?: string;
-  
-  // 左侧内容区域
+interface CommonLayoutProps {
+  // 左侧内容区域 (1/3)
   leftContent: ReactNode;
   leftClassName?: string;
   
-  // 右侧内容区域
+  // 中间内容区域 (1/3)
+  centerContent: ReactNode;
+  centerClassName?: string;
+  
+  // 右侧内容区域 (1/3)
   rightContent: ReactNode;
   rightClassName?: string;
   
-  // 主内容区域样式
-  mainClassName?: string;
+  // 整体容器样式
+  containerClassName?: string;
   
-  // 是否使用响应式布局（tryon页面需要）
-  responsive?: boolean;
+  // 是否显示分隔线
+  showDividers?: boolean;
+  
+  // 间距大小
+  gap?: 'sm' | 'md' | 'lg';
 }
 
-const PageLayout: React.FC<PageLayoutProps> = ({
-  backgroundClassName = "h-full bg-gray-50",
+const CommonLayout: React.FC<CommonLayoutProps> = ({
   leftContent,
-  leftClassName,
+  leftClassName = '',
+  centerContent,
+  centerClassName = '',
   rightContent,
-  rightClassName,
-  mainClassName = "flex-1 flex gap-6 p-4",
-  responsive = false
+  rightClassName = '',
+  containerClassName = '',
+  showDividers = false,
+  gap = 'md'
 }) => {
-  // // 根据是否响应式设置不同的样式
-  // const getLeftContainerClass = () => {
-  //   if (responsive) {
-  //     return `w-full lg:w-1/2 bg-white rounded-xl shadow-lg border border-gray-200 max-h-screen overflow-hidden flex flex-col ${leftClassName || ''}`;
-  //   }
-  //   return `w-1/2 bg-white rounded-lg shadow-sm max-h-screen overflow-y-auto ${leftClassName || ''}`;
-  // };
+  // 根据gap参数设置间距
+  const getGapClass = () => {
+    switch (gap) {
+      case 'sm': return 'gap-2';
+      case 'md': return 'gap-4';
+      case 'lg': return 'gap-6';
+      default: return 'gap-4';
+    }
+  };
 
-  // const getRightContainerClass = () => {
-  //   if (responsive) {
-  //     return `w-full lg:w-1/2 p-6 lg:p-8 bg-white rounded-xl shadow-lg border border-gray-200 max-h-screen overflow-y-auto ${rightClassName || ''}`;
-  //   }
-  //   return `w-1/2 p-4 lg:p-8 bg-white rounded-lg shadow-sm max-h-screen overflow-y-auto ${rightClassName || ''}`;
-  // };
-
-  // const getMainContainerClass = () => {
-  //   if (responsive) {
-  //     return "flex-1 flex gap-6 p-4";
-  //   }
-  //   return mainClassName;
-  // };
-
-  // return (
-  //   <div className={backgroundClassName}>
-  //     <main className="flex flex-row h-full">
-  //       {/* 主内容区域 */}
-  //       <div className={getMainContainerClass()}>
-  //         {/* 左侧输入区域 */}
-  //         <div className={getLeftContainerClass()}>
-  //           {responsive ? (
-  //             <div className="flex-1 overflow-y-auto">
-  //               <div className="p-6 lg:p-8">
-  //                 {leftContent}
-  //               </div>
-  //             </div>
-  //           ) : (
-  //             <div className="p-8">
-  //               {leftContent}
-  //             </div>
-  //           )}
-  //         </div>
-
-  //         {/* 右侧结果展示区域 */}
-  //         <div className={getRightContainerClass()}>
-  //           {rightContent}
-  //         </div>
-  //       </div>
-  //     </main>
-  //   </div>
-  // );
+  // 默认的容器样式，增加更好的间距和响应式设计
+  const defaultContainerClass = `h-full bg-gray-50 p-4 ${getGapClass()}`;
+  
+  // 默认的面板样式，增加内边距，防止内容过于紧密
+  const defaultPanelClass = 'bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200 min-w-0';
+  
   return (
-        <div className="h-full bg-gray-50">
-          <div className="flex flex-row h-full">
-              {/* 主内容区域 */}
-              <div className="flex-1 flex gap-6 p-4">
-                  {/* 左侧输入区域 */}
-                  <div className="w-1/2 bg-white rounded-lg shadow-sm max-h-screen overflow-y-auto">
-                      <div className="p-8">
-                          {leftContent}
-                      </div>
-                  </div>
-
-                  {/* 右侧结果展示区域 */}
-                  <div className="w-1/2 p-4 lg:p-8 bg-white rounded-lg shadow-sm max-h-screen overflow-y-auto">
-                      {rightContent}
-                  </div>
-              </div>
+    <div className={`${defaultContainerClass} ${containerClassName}`}>
+      {/* 桌面端：水平布局 */}
+      <div className={`hidden lg:flex h-full ${getGapClass()}`}>
+        {/* 左侧面板 - 1/3 宽度 (33.33%) */}
+        <div className={`${defaultPanelClass} ${leftClassName}`} style={{flex: '1'}}>
+          <div className="h-full overflow-y-auto overflow-x-hidden p-4">
+            {leftContent}
           </div>
+          {showDividers && (
+            <div className="absolute top-0 right-0 w-px h-full bg-gray-200" />
+          )}
+        </div>
+
+        {/* 中间面板 - 1/3 宽度 (33.33%) */}
+        <div className={`${defaultPanelClass} ${centerClassName}`} style={{flex: '1'}}>
+          <div className="h-full overflow-y-auto overflow-x-hidden p-4">
+            {centerContent}
+          </div>
+          {showDividers && (
+            <div className="absolute top-0 right-0 w-px h-full bg-gray-200" />
+          )}
+        </div>
+
+        {/* 右侧面板 - 1/3 宽度 (33.33%) */}
+        <div className={`${defaultPanelClass} ${rightClassName}`} style={{flex: '1'}}>
+          <div className="h-full overflow-y-auto overflow-x-hidden p-4">
+            {rightContent}
+          </div>
+        </div>
       </div>
+
+      {/* 移动端：垂直布局 */}
+      <div className={`lg:hidden flex flex-col h-full ${getGapClass()}`}>
+        {/* 左侧面板 */}
+        <div className={`flex-shrink-0 ${defaultPanelClass} ${leftClassName}`}>
+          <div className="max-h-64 overflow-y-auto overflow-x-hidden p-4">
+            {leftContent}
+          </div>
+        </div>
+
+        {/* 中间面板 */}
+        <div className={`flex-1 ${defaultPanelClass} ${centerClassName}`}>
+          <div className="h-full overflow-y-auto overflow-x-hidden p-4">
+            {centerContent}
+          </div>
+        </div>
+
+        {/* 右侧面板 */}
+        <div className={`flex-shrink-0 ${defaultPanelClass} ${rightClassName}`}>
+          <div className="max-h-64 overflow-y-auto overflow-x-hidden p-4">
+            {rightContent}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 
-export default PageLayout;
+export default CommonLayout;

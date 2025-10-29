@@ -15,6 +15,7 @@ import {
     SupportFrameImageModelList,
 } from '@/constants/VeoData';
 import PageLayout from '@/components/PageLayout';
+import TaskHistory from '@/components/TaskHistory';
 import { ImageUpload } from '@/components/ImageUpload';
 
 
@@ -353,7 +354,7 @@ export default function VeoPage() {
                     </div>
                     
                     {generatedVideos.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-3/5 text-gray-400 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+                        <div className="flex flex-col items-center justify-center h-64 lg:h-3/5 text-gray-400 bg-white rounded-xl border-2 border-dashed border-gray-200">
                             <VideoGenerateResultIcon/>
                         </div>
                     ) : (
@@ -377,11 +378,28 @@ export default function VeoPage() {
         </>
     );
 
+    // 历史记录内容
+    const historyContent = (
+        <>
+        <div className="flex items-center mb-6">
+            <span className="text-blue-500 mr-2">●</span>
+            <span className="text-xl font-semibold text-gray-800">历史记录</span>
+        </div>
+        <TaskHistory
+            path="veo"
+            page={1}
+            page_size={10}
+            className=""
+        />
+        </>
+    );
+
     return (
         <>
             <PageLayout
                 leftContent={leftContent}
-                rightContent={rightContent}
+                centerContent={rightContent}
+                rightContent={historyContent}
             />
         
         {/* 错误提示弹窗 */}

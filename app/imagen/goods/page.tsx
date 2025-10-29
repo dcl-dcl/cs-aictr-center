@@ -8,30 +8,14 @@ import {
  } from '@ant-design/icons';
 import CommonLayout from '@/components/ChildrenLayout';
 import ErrorModal from '@/components/ErrorModal';
+import TaskHistory from '@/components/TaskHistory';
 import { ImageUpload } from '@/components/ImageUpload';
-import { downloadSingleFile, MediaType } from '@/components/MediaPreview';
+// import { downloadSingleFile, MediaType } from '@/components/MediaPreview';
 import { MediaFile } from '@/types/BaseType'
 import { AspectRatioOptions, productExamples, recommendedScenesTabs, GoodsGenImageModel } from '@/constants/GoodsData';
 import { apiFetch } from '@/lib/utils/api-client';
 
-
 const { TextArea } = Input;
-const FakeHistoryRecords = [
-  {
-    id: '1',
-    image: '',
-    prompt: '简约风格商品展示',
-    time: '2分钟前',
-    status: '已完成'
-  },
-  {
-    id: '2',
-    image: '',
-    prompt: '高端奢华展示效果',
-    time: '5分钟前',
-    status: '已完成'
-  }
-]
 
 // CardWrapper组件 - 用于包装Card组件
 const CardWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -195,16 +179,10 @@ const GoodsPage: React.FC = () => {
   const [lighting, setLighting] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [generatedImages, setGeneratedImages] = useState<Array<MediaFile>>([]);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const [activeSceneTab, setActiveSceneTab] = useState<string>(recommendedScenesTabs[0].key);
   const [selectedScene, setSelectedScene] = useState<string>('');
   const [isSceneExpanded, setIsSceneExpanded] = useState<boolean>(false);
-  const [history, setHistory] = useState<{
-    id: string;
-    image: string;
-    prompt: string;
-    time: string;
-    status: string;
-  }[]>(FakeHistoryRecords);
   const [errorStat, setErrorStat] = useState<{showError: boolean, error: string}>({showError: false, error: ''});
   const [currentExampleImages, setCurrentExampleImages] = useState(productExamples);
 
@@ -226,6 +204,7 @@ const GoodsPage: React.FC = () => {
     reqFormData.append('prompt', prompt);
     reqFormData.append('configParameters', JSON.stringify({'aspectRatio': aspectRatio}));
     reqFormData.append('modelName', GoodsGenImageModel);
+    reqFormData.append('taskFromTab', `imagen/goods`);
 
     //发送请求
     try {
@@ -243,6 +222,8 @@ const GoodsPage: React.FC = () => {
       setErrorStat({showError: true, error: `生成图片失败：${errorMessage}`});
     } finally {
       setIsGenerating(false);
+      // 无论成功或失败都刷新历史记录以展示最新任务状态
+      setHistoryRefreshKey((k) => k + 1);
     }
   };
 
@@ -544,7 +525,7 @@ const GoodsPage: React.FC = () => {
 
   // 右侧面板内容
   const rightContent = (
-    <Card 
+    <Card
       title={
         <div className="flex items-center space-x-2 text-purple-600">
           <HistoryOutlined className="text-lg" />
@@ -564,46 +545,15 @@ const GoodsPage: React.FC = () => {
         }
       }}
     >
-        <List
-          dataSource={history}
-          renderItem={(item) => (
-            <List.Item key={item.id}>
-              <Card 
-                className="w-full mb-4 hover:shadow-md transition-shadow duration-300 border-gray-100"
-                styles={{
-                  body: { padding: '12px' }
-                }}
-              >
-                <div className="flex items-start space-x-4">
-                  <div className="w-24 h-24 bg-gray-50 rounded-lg flex items-center justify-center overflow-hidden">
-                    {item.image ? (
-                      <img
-                        src={item.image}
-                        alt={item.prompt}
-                        className="w-full h-full object-cover rounded-lg"
-                      />
-                    ) : (
-                      <PictureOutlined className="text-gray-300 text-2xl" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-900 truncate">
-                      {item.prompt}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">{item.time}</div>
-                    <div className="mt-2">
-                      <span className="text-xs px-2 py-1 bg-green-50 text-green-700 rounded-full font-medium">
-                        {item.status}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </List.Item>
-          )}
-        />
-      </Card>
-    );
+    <TaskHistory
+      path="imagen/goods"
+      page={1}
+      page_size={10}
+      className=""
+      refreshSignal={historyRefreshKey}
+      />
+    </Card>
+  );
 
   return (
     <>

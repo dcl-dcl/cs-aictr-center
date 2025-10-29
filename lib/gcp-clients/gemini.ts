@@ -4,7 +4,7 @@ import { VertexAI, GenerationConfig } from '@google-cloud/vertexai';
 
 export interface ImageData {
     data?: string; // bas64 data
-    gcsUri?: string;
+    fileUri?: string;
     mimeType: string;
 }
 
@@ -124,9 +124,15 @@ export class GenAIGemini {
         if (images && images.length > 0) {
             const parts = [];
             images.forEach(image => {
-                parts.push({
-                    inlineData: image
-                });
+                if (image.fileUri) {
+                    parts.push({
+                        fileData: image
+                    });
+                } else if (image.data) {
+                    parts.push({
+                        inlineData: image
+                    });
+                }
             });
             parts.push({
                 text: prompt
@@ -139,7 +145,8 @@ export class GenAIGemini {
         } else {
             contents = prompt;
         }
-        console.log("contents:", contents, "config:", generationConfig)
+        console.log("fileData", contents.parts[0].fileData)
+        // console.log("contents:", contents, "config:", generationConfig)
         const response = await this.aiClient.models.generateContentStream({
             model: model,
             contents: contents,

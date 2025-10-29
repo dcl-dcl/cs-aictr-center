@@ -155,16 +155,16 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
         )}
       </div>
       <PhotoProvider>
-        <div className={`grid ${gridCols} gap-3 w-full overflow-hidden`} style={{ minWidth: 0 }}>
+        <div className={`grid ${gridCols} gap-4 w-full`} style={{ minWidth: 0 }}>
           {allImages.map((item, index) => (
-            <div key={item.id || `${item.type}-${index}`} className="relative group min-w-0 max-w-full overflow-hidden">
+            <div key={item.id || `${item.type}-${index}`} className="relative group w-full overflow-hidden">
               <PhotoView src={item.src}>
-                <div className={`relative w-full ${imageHeight} bg-gray-50 rounded-md border border-gray-200 overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-200 media-container`} style={{ minWidth: 0, minHeight: 0, maxWidth: '100%' }}>
+                <div className={`relative w-full ${imageHeight} bg-gray-50 rounded-lg border border-gray-200 overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-200`} style={{ minWidth: 0, maxWidth: '100%' }}>
                   <img 
                     src={item.src} 
                     alt={item.name}
-                    className="absolute inset-0 w-full h-full object-contain transition-opacity duration-200 hover:opacity-90"
-                    style={{ minWidth: 0, minHeight: 0, maxWidth: '100%', maxHeight: '100%' }}
+                    className="w-full h-full object-contain transition-opacity duration-200 hover:opacity-90"
+                    style={{ maxWidth: '100%', maxHeight: '100%' }}
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.src = '/placeholder-image.svg';

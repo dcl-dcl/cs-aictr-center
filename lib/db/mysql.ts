@@ -15,7 +15,9 @@ export function createMysqlClient(): DatabaseClient {
 
   return {
     async query(sql, params = []) {
-      const [rows] = await pool.execute(sql, params)
+      // 使用 query 而非 execute，避免某些场景下 (LIMIT/OFFSET/IN 动态占位符)
+      // 触发 MySQL 服务器端预处理对占位符的限制从而报错：Incorrect arguments to mysqld_stmt_execute
+      const [rows] = await pool.query(sql, params)
       return rows as any[]
     },
     async close() {

@@ -15,6 +15,7 @@ import {
 import ImageToPrompt from '@/components/ImageToPrompt';
 import ErrorModal from '@/components/ErrorModal';
 import PageLayout from '@/components/PageLayout';
+import TaskHistory from '@/components/TaskHistory';
 import { 
     ImagenModelOptions, GeminiModelOptions,
     getImagenModelConfigs, ImageStyleAttributeData, NanoBananaConfigs,
@@ -44,26 +45,26 @@ const getModelConfigs = (activeTab: string, modelName: string) => {
 };
 
 export default function ImagenPage () {
-    const searchParams = useSearchParams();
-    const [activeTab, setActiveTab] = useState<string>(searchParams.get('tab') || GeminiGenerationTab);
-    const [modelOptions, setModelOptions] = useState<typeof ImagenModelOptions | typeof GeminiModelOptions>(
-        getModelOptions(activeTab)
-    )
-    const [selectedModel, setSelectedModel] = useState<string>(modelOptions[0].value)
-    const [originalPrompt, setOriginalPrompt] = useState('');
-    const [translatedPrompt, setTranslatedPrompt] = useState('');
-    const [isTranslating, setIsTranslating] = useState(false);
-    const [inputImages, setInputImages] = useState<File[]>([]);
-    const [generatedImages, setGeneratedImages] = useState<Array<MediaFile>>([]);
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [configSelections, setConfigSelections] = useState<{ [key: string]: any }>(
-        initializeConfigSelections(getModelConfigs(activeTab, selectedModel))
-    );
-    const [isImageToPromptOpen, setIsImageToPromptOpen] = useState(false);
-    const [selectedStyleAttributes, setSelectedStyleAttributes] = useState<Record<string, string>>({});
-    const [error, setError] = useState<string | null>(null);
-    const [showError, setShowError] = useState(false);
-
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<string>(searchParams.get('tab') || GeminiGenerationTab);
+  const [modelOptions, setModelOptions] = useState<typeof ImagenModelOptions | typeof GeminiModelOptions>(
+      getModelOptions(activeTab)
+  )
+  const [selectedModel, setSelectedModel] = useState<string>(modelOptions[0].value)
+  const [originalPrompt, setOriginalPrompt] = useState('');
+  const [translatedPrompt, setTranslatedPrompt] = useState('');
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [inputImages, setInputImages] = useState<File[]>([]);
+  const [generatedImages, setGeneratedImages] = useState<Array<MediaFile>>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+  const [configSelections, setConfigSelections] = useState<{ [key: string]: any }>(
+      initializeConfigSelections(getModelConfigs(activeTab, selectedModel))
+  );
+  const [isImageToPromptOpen, setIsImageToPromptOpen] = useState(false);
+  const [selectedStyleAttributes, setSelectedStyleAttributes] = useState<Record<string, string | string[]>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [showError, setShowError] = useState(false);
 
     const handleModelChange = (newModelName: string) => {
         setSelectedModel(newModelName);
@@ -86,10 +87,8 @@ export default function ImagenPage () {
     // 监听URL参数变化，同步activeTab状态
     useEffect(() => {
         const currentTab = searchParams.get('tab') || GeminiGenerationTab;
-        if (currentTab !== activeTab) {
-            setActiveTab(currentTab);
-        }
-    }, [searchParams, activeTab]);
+        setActiveTab(currentTab);
+    }, [searchParams]);
 
     // 当activeTab变化时更新相关状态
     useEffect(() => {
@@ -104,8 +103,6 @@ export default function ImagenPage () {
         setError(null);
         setShowError(false);
     }, [activeTab]);
-
-
 
     // 应用生成的提示词
     const handleApplyPrompt = (prompt: string) => {
@@ -163,15 +160,19 @@ export default function ImagenPage () {
             return;
         }
         if (selectedStyleAttributes) {
-            promptToUse = GenerateStylePrompt(selectedStyleAttributes, promptToUse, 'image')
+            // 将string[]类型的值转换为string类型
+            const stringAttributes: Record<string, string> = {};
+            Object.entries(selectedStyleAttributes).forEach(([key, value]) => {
+                stringAttributes[key] = Array.isArray(value) ? value.join(', ') : value;
+            });
+            promptToUse = GenerateStylePrompt(stringAttributes, promptToUse, 'image')
         }
-        console.log("promptToUse: ", promptToUse)
-
         setIsGenerating(true);
         //准备参数
         const formData = new FormData();
         formData.append('modelName', selectedModel);
         formData.append('prompt', promptToUse);
+        formData.append('taskFromTab', `imagen?tab=${activeTab}`);
 
         // 添加配置参数
         if (configSelections) {
@@ -197,15 +198,17 @@ export default function ImagenPage () {
             }
             setGeneratedImages(result.resultData);
 
-        } catch (error) {
-            console.error('生成图片错误:', error);
-            const errorMessage = error instanceof Error ? error.message : '未知错误';
-            setError(`生成图片失败：${errorMessage}`);
-            setShowError(true);
-        } finally {
-            setIsGenerating(false);
-        }
-    };
+    } catch (error) {
+      console.error('生成图片错误:', error);
+      const errorMessage = error instanceof Error ? error.message : '未知错误';
+      setError(`生成图片失败：${errorMessage}`);
+      setShowError(true);
+    } finally {
+      setIsGenerating(false);
+      // 无论成功或失败都刷新历史记录以展示最新任务状态
+      setHistoryRefreshKey((k) => k + 1);
+    }
+  };
 
     // 处理生成视频
     const useImageGenerateVideo = (index: number, imageData: any) => {
@@ -223,6 +226,7 @@ export default function ImagenPage () {
                 name: selectedImage.filename || `generated_image_${index}.png`,
                 type: 'image/png',
                 url: selectedImage.url,
+                gcsUri: selectedImage.gcsUri,
                 data: selectedImage
             };
 
@@ -249,7 +253,7 @@ export default function ImagenPage () {
                     />
 
                     {/* 提示词区域 */}
-                    <div className="mb-8">
+                    <div className="mb-6">
                         <div className="flex items-center mb-4">
                             <span className="text-orange-500 mr-2">●</span>
                             <h2 className="text-xl font-semibold text-gray-800">提示词输入</h2>
@@ -302,11 +306,11 @@ export default function ImagenPage () {
                     </div>
                         
                     {/* 工具栏 */}
-                    <div className="flex items-center justify-end space-x-4 mb-8">
+                    <div className="flex flex-wrap items-center justify-end gap-3 mb-6">
                                 
                         {/* 图片上传按钮 activeTab===Gemini时出现 */}
                         {activeTab === GeminiGenerationTab && (
-                            <label className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 cursor-pointer relative group transition-colors border border-gray-200 flex items-center gap-2 min-w-[120px] h-[40px] justify-center">
+                            <label className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 cursor-pointer relative group transition-colors border border-gray-200 flex items-center gap-2 min-w-[100px] sm:min-w-[120px] h-[40px] justify-center flex-shrink-0">
                                 <input
                                     type="file"
                                     accept="image/*"
@@ -324,7 +328,7 @@ export default function ImagenPage () {
                         
                         {/* 上传图片生成提示词 */}
                         <button 
-                            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 cursor-pointer relative group transition-colors border border-gray-200 flex items-center gap-2 min-w-[120px] h-[40px] justify-center"
+                            className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 cursor-pointer relative group transition-colors border border-gray-200 flex items-center gap-2 min-w-[100px] sm:min-w-[120px] h-[40px] justify-center flex-shrink-0"
                             onClick={() => setIsImageToPromptOpen(true)}
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -336,7 +340,7 @@ export default function ImagenPage () {
 
                         {/* 翻译按钮 */}
                         <button 
-                            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 relative group transition-colors border border-gray-200 flex items-center gap-2 min-w-[120px] h-[40px] justify-center"
+                            className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 relative group transition-colors border border-gray-200 flex items-center gap-2 min-w-[100px] sm:min-w-[120px] h-[40px] justify-center flex-shrink-0"
                             onClick={handleTranslate}
                             disabled={isTranslating}
                             title="翻译提示词"
@@ -357,7 +361,7 @@ export default function ImagenPage () {
                         
                         {/* 重置按钮 */}
                         <button 
-                            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 relative group transition-colors border border-gray-200 flex items-center gap-2 min-w-[120px] h-[40px] justify-center"
+                            className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 relative group transition-colors border border-gray-200 flex items-center gap-2 min-w-[100px] sm:min-w-[120px] h-[40px] justify-center flex-shrink-0"
                             onClick={() => handleReset()}
                             title="重置"
                         >
@@ -371,7 +375,7 @@ export default function ImagenPage () {
                         <button
                             onClick={handleGenerate}
                             disabled={isGenerating}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 transition-all duration-200 font-medium shadow-sm hover:shadow-md min-w-[120px] h-[40px] justify-center"
+                            className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 transition-all duration-200 font-medium shadow-sm hover:shadow-md min-w-[100px] sm:min-w-[120px] h-[40px] justify-center flex-shrink-0"
                         >
                             {isGenerating ? (
                                 <>
@@ -392,48 +396,55 @@ export default function ImagenPage () {
 
                     {/* 参数设置区域 */}
                     {(Object.keys(configSelections).length > 0) && (
-                        <ConfigurationPanel
-                            title="设置"
-                            titleColor="text-purple-500"
-                            configSelections={configSelections}
-                        configs={getModelConfigs(activeTab, selectedModel)}
-                        itemsPerRow={activeTab === ImagenGenerationTab? 2 : 1}
-                            onConfigChange={(configId, value) => {
-                                setConfigSelections(prev => ({
-                                    ...prev,
-                                    [configId]: value
-                                }));
-                        }}
-                    />         
+                        <div className="mb-6">
+                            <ConfigurationPanel
+                                title="设置"
+                                titleColor="text-purple-500"
+                                configSelections={configSelections}
+                                configs={getModelConfigs(activeTab, selectedModel)}
+                                // itemsPerRow={activeTab === ImagenGenerationTab? 2 : 1}
+                                onConfigChange={(configId, value) => {
+                                    setConfigSelections(prev => ({
+                                        ...prev,
+                                        [configId]: value
+                                    }));
+                                }}
+                            />         
+                        </div>
                     )}   
                     
                     {/* 图像提示词属性 */}
-                    <StyleAttributesSelector
-                        title="图像提示属性"
-                        titleColor="text-blue-500"
-                        attributeGroups={ImageStyleAttributeData as AttributeGroup[]}
-                        selectedAttributes={selectedStyleAttributes}
-                        onAttributeChange={(groupId, value) => {
-                            setSelectedStyleAttributes(prev => ({
-                                ...prev,
-                                [groupId]: value as string
-                            }));
-                        }}
-                    />
+                    <div className="mb-6">
+                        <StyleAttributesSelector
+                            title="图像提示属性"
+                            titleColor="text-blue-500"
+                            attributeGroups={ImageStyleAttributeData as AttributeGroup[]}
+                            selectedAttributes={selectedStyleAttributes}
+                            onAttributeChange={(groupId, value) => {
+                                setSelectedStyleAttributes(prev => ({
+                                    ...prev,
+                                    [groupId]: value
+                                }));
+                            }}
+                        />
+                    </div>
         </>
     );
 
-    // 右侧内容
-    const rightContent = (
+    // 中间内容 - 生成结果
+    const centerContent = (
         <>
-                    <div className="flex items-center mb-8">
+                    <div className="flex items-center mb-6">
                         <span className="text-green-500 mr-2">●</span>
                         <span className="text-xl font-semibold text-gray-800">生成结果</span>
                     </div>
                     
                     {generatedImages.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-3/5 text-gray-400 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
-                            <ImageGenerateResultIcon/>
+                        <div className="flex flex-col items-center justify-center h-64 lg:h-3/5 text-gray-400 bg-white rounded-xl border-2 border-dashed border-gray-200">
+                            <ImageGenerateResultIcon
+                                primaryText="生成的图像将在这里显示"
+                                secondaryText="请输入提示词，然后点击生成按钮开始创作"
+                            />
                         </div>
                     ) : (
                     <>
@@ -441,14 +452,14 @@ export default function ImagenPage () {
                             urlImages={generatedImages}
                             showRemove={false}
                             showDownload={true}
-                            showBatchDownload={true}
+                            showBatchDownload={false}
                             showGenerateVideo={true}
                             onDownload={(index, data) => downloadSingleFile(data as MediaFile)}
                             onBatchDownload={() => downloadAllFiles(generatedImages)}
-                            onGenerateVideo={useImageGenerateVideo}
+                            // onGenerateVideo={useImageGenerateVideo}
                             title=''
-                            imageHeight='h-80'     
-                            gridCols="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+                            imageHeight='h-64'     
+                            gridCols="grid-cols-1 sm:grid-cols-2"
                             buttonSize="w-5 h-5"
                             className=""
                         />                
@@ -458,11 +469,31 @@ export default function ImagenPage () {
         </>
     );
 
+    // 右侧内容 - 历史记录
+    const rightContent = (
+        <>
+            <div className="flex items-center mb-6">
+                <span className="text-blue-500 mr-2">●</span>
+                <span className="text-xl font-semibold text-gray-800">历史记录</span>
+            </div>
+            <TaskHistory
+                path="imagen"
+                tab={activeTab}
+                page={1}
+                page_size={10}
+                className=""
+                refreshSignal={historyRefreshKey}
+            />
+        </>
+    );
+
     return (
         <>
             <PageLayout
                 leftContent={leftContent}
+                centerContent={centerContent}
                 rightContent={rightContent}
+                containerClassName="h-full bg-gradient-to-br from-gray-50 to-gray-100"
             />
         
             {/* 错误提示弹窗 */}

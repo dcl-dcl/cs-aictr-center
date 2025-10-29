@@ -30,7 +30,7 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
   configSelections,
   configs,
   onConfigChange,
-  itemsPerRow = 2
+  itemsPerRow = 1
 }) => {
   // 配置变更时自动保存到本地存储
   useEffect(() => {
@@ -59,30 +59,22 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
     return null;
   }
 
-  const getAspectRatioIcon = (ratio: string) => {
-    const ratioMap: {[key: string]: {width: number, height: number}} = {
-      '1:1': {width: 20, height: 20},
-      '3:2': {width: 24, height: 16},
-      '2:3': {width: 16, height: 24},
-      '4:3': {width: 24, height: 18},
-      '3:4': {width: 18, height: 24},
-      '4:5': {width: 20, height: 25},
-      '5:4': {width: 25, height: 20},
-      '9:16': {width: 18, height: 32},
-      '16:9': {width: 32, height: 18},
-      '21:9': {width: 42, height: 18}
-    };
-    
-    const dimensions = ratioMap[ratio] || {width: 20, height: 20};
-    
+  const getAspectRatioIcon = (ratio: string, active: boolean = false) => {
+    // 解析比例字符串，例如 "16:9" => [16, 9]
+    const [w, h] = ratio.split(':').map(Number);
+    // 固定图标容器尺寸，确保所有比例图形统一视觉大小
+    const boxSize = 28; // px，统一容器尺寸（略微缩小以避免溢出）
+    const scale = Math.min(boxSize / w, boxSize / h);
+    const width = Math.max(Math.round(w * scale), 10);
+    const height = Math.max(Math.round(h * scale), 10);
+
     return (
-      <div 
-        className="border-2 border-gray-400 bg-gray-200"
-        style={{
-          width: `${dimensions.width}px`,
-          height: `${dimensions.height}px`
-        }}
-      />
+      <div style={{ width: boxSize, height: boxSize, maxWidth: '100%', maxHeight: '100%' }} className="flex items-center justify-center">
+        <div
+          className={`rounded border-2 ${active ? 'bg-blue-500 border-blue-500' : 'bg-gray-100 border-gray-300'}`}
+          style={{ width, height, maxWidth: '100%', maxHeight: '100%' }}
+        />
+      </div>
     );
   };
 
@@ -107,19 +99,21 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
                     {config.options.map((option) => (
                       <button
                         key={option.value}
-                        className={`flex flex-col items-center justify-center gap-0.5 p-1 rounded border transition-all duration-200 aspect-square transform hover:scale-105 ${
+                        className={`cursor-pointer p-2 rounded-lg border-2 transition-all duration-200 w-16 h-16 ${
                           currentValue === option.value
-                            ? 'bg-blue-500 border-blue-500 text-white shadow-lg'
-                            : 'bg-white border-gray-300 hover:border-blue-400 hover:shadow-md'
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300'
                         }`}
                         onClick={() => onConfigChange(config.id, option.value)}
                       >
-                        <div className="flex items-center justify-center mb-1">
-                          {getAspectRatioIcon(option.value)}
+                        <div className="flex flex-col items-center justify-between h-full">
+                          <div className="flex items-center justify-center w-full h-3/4">
+                            {getAspectRatioIcon(option.value, currentValue === option.value)}
+                          </div>
+                          <div className="text-center">
+                            <span className="text-xs font-medium leading-none text-gray-700">{option.label}</span>
+                          </div>
                         </div>
-                        <span className={`text-xs font-medium text-center ${
-                          currentValue === option.value ? 'text-white' : 'text-gray-700'
-                        }`}>{option.label}</span>
                       </button>
                     ))}
                   </div>
