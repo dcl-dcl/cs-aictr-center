@@ -3,10 +3,7 @@
 import React from 'react';
 import { apiFetch } from '@/lib/utils/api-client';
 import { MediaFile } from '@/types/BaseType'
-import dynamic from 'next/dynamic'
-// 懒加载相册库，避免首屏加载体积过大
-const PhotoProvider = dynamic(() => import('./PhotoViewClient').then(mod => mod.PhotoProvider), { ssr: false })
-const PhotoView = dynamic(() => import('./PhotoViewClient').then(mod => mod.PhotoView), { ssr: false })
+import { Image as AntImage } from 'antd'
 
 export interface ImageWithBase64 {
     base64Data: string;
@@ -158,36 +155,34 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
           </button>
         )}
       </div>
-      <PhotoProvider>
-        <div className={`grid ${gridCols} gap-4 w-full`} style={{ minWidth: 0 }}>
-          {allImages.map((item, index) => (
-            <div key={item.id || `${item.type}-${index}`} className="relative group w-full overflow-hidden">
-              <PhotoView src={item.src}>
-                <div className={`relative w-full ${imageHeight} bg-gray-50 rounded-lg border border-gray-200 overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-200`} style={{ minWidth: 0, maxWidth: '100%' }}>
-                  <img 
-                    src={item.src} 
-                    alt={item.name}
-                    className="w-full h-full object-contain transition-opacity duration-200 hover:opacity-90"
-                    style={{ maxWidth: '100%', maxHeight: '100%' }}
-                    loading="lazy"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.src = '/placeholder-image.svg';
-                    }}
-                  />
-                </div>
-              </PhotoView>
+      <div className={`grid ${gridCols} gap-4 w-full`} style={{ minWidth: 0 }}>
+        {allImages.map((item, index) => (
+          <div key={item.id || `${item.type}-${index}`} className="relative group w-full overflow-hidden">
+        <div className="relative w-full aspect-square bg-gray-50 rounded-lg border border-gray-200 hover:shadow-lg transition-all duration-200 flex items-center justify-center">
+          <AntImage
+            src={item.src}
+            alt={item.name}
+            preview={{mask: null}}
+            fallback="/placeholder-image.svg"
+            placeholder={<div className="w-full h-full bg-gray-100" />}
+            wrapperClassName="w-full h-full flex items-center justify-center" // 控制容器
+            className="block transition-opacity duration-200 hover:opacity-90 object-contain object-center max-w-full max-h-full"
+            draggable={false}
+          />
+        </div>
               
               {/* 按钮容器 */}
-              <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
                 {/* 删除按钮 */}
                 {showRemove && onRemove && (
                   <button
                     onClick={() => handleRemove(item)}
-                    className={`bg-red-500 text-white rounded-full ${buttonSize} flex items-center justify-center text-xs hover:bg-red-600`}
+                    className="bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-70 transition-colors"
                     title="删除图片"
                   >
-                    ×
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                   </button>
                 )}
                 
@@ -195,7 +190,7 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
                 {showDownload && (
                   <button
                     onClick={() => handleDownload(item)}
-                    className="bg-blue-500 text-white rounded-full w-8 h-8 flex items-center justify-center text-xs hover:bg-blue-600"
+                    className="bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-70 transition-colors"
                     title="下载图片"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -208,7 +203,7 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
                 {showGenerateVideo && onGenerateVideo && (
                   <button
                     onClick={() => handleGenerateVideo(item)}
-                    className="bg-purple-500 text-white rounded-full w-8 h-8 flex items-center justify-center text-xs hover:bg-purple-600"
+                    className="bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-70 transition-colors"
                     title="生成视频"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -217,25 +212,16 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
                   </button>
                 )}
               </div>
-              
-              {/* 放大图标提示 */}
-              <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
-                </svg>
-              </div>
-              
               {/* 图片信息 */}
-              <div className="mt-2">
-                <p className="text-xs text-gray-500 truncate" title={item.name}>{item.name}</p>
-                {item.mimeType && (
-                  <p className="text-xs text-gray-400">{item.mimeType}</p>
+            <div className="mt-2">
+                  {item.mimeType && (
+                <span className="text-xs text-gray-400">{item.mimeType}{ ' ' }</span>
                 )}
+                <span className="text-xs text-gray-500 truncate" title={item.name}>{item.name}</span>
               </div>
             </div>
           ))}
         </div>
-      </PhotoProvider>
     </div>
   );
 };
