@@ -21,7 +21,6 @@ export const GET = withAuth(async (req: AuthenticatedRequest) => {
     if (!task) {
       return NextResponse.json({ success: false, message: 'Task not found' }, { status: 404 })
     }
-
     // 刷新文件的预览URL并返回完整详情
     const { input_files, output_files } = await getTaskFilesByTaskId(task_id)
     const taskWithFiles = { ...task, input_files, output_files }

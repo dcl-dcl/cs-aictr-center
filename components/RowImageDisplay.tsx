@@ -37,6 +37,8 @@ export default function RowImageDisplay({ images, className = '' }: RowImageDisp
                       fill
                       sizes={`${CARD_SIZE}px`}
                       style={{ objectFit: 'cover' }}
+                      loading="lazy"
+                      priority={false}
                       onError={(e) => {
                         console.error('Image load error:', e)
                       }}

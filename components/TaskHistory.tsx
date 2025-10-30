@@ -279,59 +279,15 @@ export default function TaskHistory({
       document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [showDateFilter])
-  
-  if (loading) {
-    return (
-      <div className={`${className}`}>
-        <div className="flex items-center justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-          <span className="ml-2 text-gray-600">加载历史记录中...</span>
-        </div>
-      </div>
-    )
-  }
-  
-  if (error) {
-    return (
-      <div className={`${className}`}>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-center">
-            <svg className="w-5 h-5 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span className="text-red-700">{error}</span>
-          </div>
-          <button
-            onClick={() => fetchHistory(1, path, tab, page_size, dateRange)}
-            className="mt-2 text-red-600 hover:text-red-800 text-sm underline"
-          >
-            重试
-          </button>
-        </div>
-      </div>
-    )
-  }
-  
-  if (tasks.length === 0) {
-    return (
-      <div className={`${className}`}>
-        <div className="text-center py-8 text-gray-500">
-          <svg className="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-          </svg>
-          <p>暂无历史记录</p>
-        </div>
-      </div>
-    )
-  }
+  // 保持顶部筛选与刷新控件固定，列表区域内处理加载/错误/空状态
   
   return (
     <div className={`${className}`}>
       <div className="space-y-6">
         {/* 标题和筛选器 */}
         <div className="space-y-4">
-          {/* 时间范围筛选器 */}
-          <div className="flex items-center justify-end mb-4 min-w-0">
+          {/* 时间范围筛选器（固定在顶部） */}
+          <div className="sticky top-0 z-20 bg-white border-b border-gray-200 flex items-center justify-end mb-4 min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
               {/* 时间下拉菜单 */}
                <div className="relative date-filter-dropdown">
@@ -358,7 +314,7 @@ export default function TaskHistory({
                           type="date"
                           value={dateRange.startDate}
                           onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm  text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                           placeholder="开始日期"
                         />
                         <span className="text-gray-400">—</span>
@@ -366,7 +322,7 @@ export default function TaskHistory({
                           type="date"
                           value={dateRange.endDate}
                           onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                           placeholder="结束日期"
                         />
                       </div>
@@ -447,9 +403,51 @@ export default function TaskHistory({
           </div>
         </div>
         
-        {/* 历史记录列表 */}
+        {/* 历史记录列表区域：在此处显示加载骨架、错误、空状态或列表 */}
         <div className="space-y-6">
-          {Array.isArray(tasks) && tasks.map((task) => (
+          {loading && (
+            <div className="space-y-4">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
+                  <div className="h-4 bg-gray-200 rounded w-2/3 mb-3"></div>
+                  <div className="flex items-center gap-4">
+                    <div className="h-3 bg-gray-200 rounded w-24"></div>
+                    <div className="h-3 bg-gray-200 rounded w-16"></div>
+                    <div className="h-3 bg-gray-200 rounded w-32"></div>
+                  </div>
+                  <div className="mt-4 h-24 bg-gray-100 rounded"></div>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {!loading && error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <svg className="w-5 h-5 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-red-700">{error}</span>
+              </div>
+              <button
+                onClick={() => fetchHistory(1, path, tab, page_size, dateRange)}
+                className="mt-2 text-red-600 hover:text-red-800 text-sm underline"
+              >
+                重试
+              </button>
+            </div>
+          )}
+          
+          {!loading && !error && tasks.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              <svg className="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              <p>暂无历史记录</p>
+            </div>
+          )}
+          
+          {!loading && !error && tasks.length > 0 && Array.isArray(tasks) && tasks.map((task) => (
             <div
               key={task.id}
               className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-6"
@@ -505,12 +503,6 @@ export default function TaskHistory({
                   </div>
                 </div>
                 
-                {/* 错误信息显示 */}
-                {task.status === TaskStatus.FAILED && task.error_message && (
-                  <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-600 break-words whitespace-pre-wrap">
-                    <span className="font-medium">错误信息:</span> {task.error_message}
-                  </div>
-                )}
               </div>
               {/* 详情展开区域：按需加载并展示输入/输出图片 */}
               {expandedTaskId === task.id && (
@@ -529,6 +521,14 @@ export default function TaskHistory({
                           <RowImageDisplay images={detailsByTaskId[task.id].input_files} />
                         </div>
                       )}
+                      
+                      {/* 错误信息显示：仅在展开详情时展示，并置于输入图片下方 */}
+                      {task.status === TaskStatus.FAILED && task.error_message && (
+                        <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-600 break-words whitespace-pre-wrap">
+                          <span className="font-medium">错误信息:</span> {task.error_message}
+                        </div>
+                      )}
+                      
                       {detailsByTaskId[task.id].output_files?.length > 0 && (
                         <div>
                           <div className="text-sm text-gray-600 mb-2">输出图片</div>
@@ -541,9 +541,6 @@ export default function TaskHistory({
                           />
                         </div>
                       )}
-                      {(!detailsByTaskId[task.id].input_files?.length && !detailsByTaskId[task.id].output_files?.length) && (
-                        <div className="text-sm text-gray-500">该任务没有图片文件</div>
-                      )}
                     </>
                   )}
                 </div>
@@ -552,7 +549,7 @@ export default function TaskHistory({
             </div>
           ))}
           {/* 分页控件 */}
-          {pagination.total_pages >= 1 && (
+          {!loading && !error && pagination.total_pages >= 1 && (
             <div className="flex items-center justify-between border-t border-gray-200 pt-6">
               <div className="text-sm text-gray-500">
                 显示第 {((pagination.current_page - 1) * pagination.page_size) + 1} - {Math.min(pagination.current_page * pagination.page_size, pagination.total_count)} 条，共 {pagination.total_count} 条记录

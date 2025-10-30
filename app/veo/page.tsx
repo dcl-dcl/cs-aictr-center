@@ -16,11 +16,22 @@ import {
     SupportFrameImageModelList,
 } from '@/constants/VeoData';
 import PageLayout from '@/components/PageLayout';
-// 动态导入历史记录组件，避免首次渲染阻塞
+// 动态导入历史记录组件，避免首次渲染阻塞，并使用骨架屏
 const TaskHistory = dynamic(() => import('@/components/TaskHistory'), {
   ssr: false,
   loading: () => (
-    <div className="p-4 text-gray-600">历史记录加载中...</div>
+    <div className="space-y-4">
+      {[...Array(2)].map((_, i) => (
+        <div key={i} className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
+          <div className="h-4 bg-gray-200 rounded w-2/3 mb-3"></div>
+          <div className="flex items-center gap-4">
+            <div className="h-3 bg-gray-200 rounded w-24"></div>
+            <div className="h-3 bg-gray-200 rounded w-16"></div>
+            <div className="h-3 bg-gray-200 rounded w-32"></div>
+          </div>
+        </div>
+      ))}
+    </div>
   )
 });
 import { ImageUpload } from '@/components/ImageUpload';

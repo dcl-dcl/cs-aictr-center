@@ -1,8 +1,12 @@
+'use client'
+
 import React from 'react';
 import { apiFetch } from '@/lib/utils/api-client';
 import { MediaFile } from '@/types/BaseType'
-import { PhotoProvider, PhotoView } from 'react-photo-view';
-import 'react-photo-view/dist/react-photo-view.css';
+import dynamic from 'next/dynamic'
+// 懒加载相册库，避免首屏加载体积过大
+const PhotoProvider = dynamic(() => import('./PhotoViewClient').then(mod => mod.PhotoProvider), { ssr: false })
+const PhotoView = dynamic(() => import('./PhotoViewClient').then(mod => mod.PhotoView), { ssr: false })
 
 export interface ImageWithBase64 {
     base64Data: string;
@@ -165,6 +169,7 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
                     alt={item.name}
                     className="w-full h-full object-contain transition-opacity duration-200 hover:opacity-90"
                     style={{ maxWidth: '100%', maxHeight: '100%' }}
+                    loading="lazy"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.src = '/placeholder-image.svg';

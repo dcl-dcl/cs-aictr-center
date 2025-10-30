@@ -71,6 +71,8 @@ export default function StackedImageDisplay({ images, className = ''}: StackedIm
                       fill
                       sizes={`${CARD_SIZE}px`}
                       style={{ objectFit: 'cover' }}
+                      loading="lazy"
+                      priority={false}
                       onError={(e) => {
                         console.error('Image load error:', e)
                       }}
