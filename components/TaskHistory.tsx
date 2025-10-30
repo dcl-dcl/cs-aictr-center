@@ -82,8 +82,19 @@ export default function TaskHistory({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showDateFilter, setShowDateFilter] = useState(false)
-  // const isLoadingRef = useRef(false)
-  // const lastRequestRef = useRef<string>('')
+  // 移除全局 hover 状态，避免鼠标悬停导致整个列表重渲染
+  
+  // 时间格式化器，减少重复计算成本
+  const timeFormatter = useMemo(() => {
+    try {
+      return new Intl.DateTimeFormat('zh-CN', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit'
+      })
+    } catch {
+      return null
+    }
+  }, [])
   
   // 时间范围状态 - 默认最近7天
   const defaultDateRange = useMemo(() => {
@@ -173,14 +184,22 @@ export default function TaskHistory({
           endDate: useDateRange.endDate
         })
         
+        console.time('TaskHistory: fetch+parse')
         const response = await apiFetch(`/api/tasks/history?${params}`)
         const result = await response.json()
+        console.timeEnd('TaskHistory: fetch+parse')
         
         if (result.success) {
           // 检查是否是新版本分页API响应（包含tasks字段）
           if (result.data && typeof result.data === 'object' && 'tasks' in result.data) {
             // 新版本API响应格式
-            setTasks(Array.isArray(result.data.tasks) ? result.data.tasks : [])
+            const incomingTasks = Array.isArray(result.data.tasks) ? result.data.tasks : []
+            const avgPromptLen = incomingTasks.length > 0 ? (
+              incomingTasks.reduce((sum: number, t: any) => sum + (t?.prompt?.length || 0), 0) / incomingTasks.length
+            ) : 0
+            console.log('[TaskHistory Perf] tasks_count:', incomingTasks.length, 'avg_prompt_len:', Math.round(avgPromptLen))
+            console.time('TaskHistory: state->render')
+            setTasks(incomingTasks)
             setPagination({
               current_page: result.data.page || 1,
               page_size: result.data.page_size || usePageSize,
@@ -189,7 +208,13 @@ export default function TaskHistory({
             })
           } else {
             // 旧版本API响应格式（向后兼容）
-            setTasks(Array.isArray(result.data) ? result.data : [])
+            const incomingTasks = Array.isArray(result.data) ? result.data : []
+            const avgPromptLen = incomingTasks.length > 0 ? (
+              incomingTasks.reduce((sum: number, t: any) => sum + (t?.prompt?.length || 0), 0) / incomingTasks.length
+            ) : 0
+            console.log('[TaskHistory Perf] tasks_count:', incomingTasks.length, 'avg_prompt_len:', Math.round(avgPromptLen))
+            console.time('TaskHistory: state->render')
+            setTasks(incomingTasks)
             setPagination(result.pagination || {
               current_page: 1,
               page_size: usePageSize,
@@ -224,6 +249,13 @@ export default function TaskHistory({
       throw error;
     }
   }, [path, tab, page_size, dateRange])
+  
+  // 渲染提交耗时（从 setTasks 到组件渲染完成）
+  useEffect(() => {
+    try {
+      console.timeEnd('TaskHistory: state->render')
+    } catch {}
+  }, [tasks])
 
   // 展开/收起任务详情，并在展开时按需拉取图片数据
   const openTaskDetails = useCallback(async (taskId: number) => {
@@ -248,6 +280,116 @@ export default function TaskHistory({
       setDetailsLoadingId(null)
     }
   }, [expandedTaskId, detailsByTaskId])
+
+  // 单条任务项（Memo），减少不相关状态变化导致的整列表重渲染
+  const TaskItem = React.memo(function TaskItem({
+    task,
+    isExpanded,
+    details,
+    isLoading,
+    openTaskDetails,
+    timeFormatter
+  }: {
+    task: GenerationTask;
+    isExpanded: boolean;
+    details?: { input_files: TaskFile[]; output_files: TaskFile[] };
+    isLoading: boolean;
+    openTaskDetails: (id: number) => void;
+    timeFormatter: Intl.DateTimeFormat | null;
+  }) {
+    const [hovered, setHovered] = useState(false)
+    const statusDisplay = getStatusDisplay(task.status)
+
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-6">
+        <div className="mb-2">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start gap-3 mb-3 min-w-0">
+                <div className="flex-1 min-w-0">
+                  {task.prompt && (
+                    <div
+                      className="relative min-w-0"
+                      onMouseEnter={() => setHovered(true)}
+                      onMouseLeave={() => setHovered(false)}
+                    >
+                      <p className="text-sm text-gray-600 overflow-hidden">
+                        <span className="truncate block w-full">
+                          {task.prompt}
+                        </span>
+                      </p>
+                      {hovered && (
+                        <div className="absolute left-0 top-full mt-1 p-3 bg-gray-800 text-white text-sm rounded-lg shadow-lg z-20 max-w-lg transition-all duration-200">
+                          <div className="whitespace-pre-wrap break-words">
+                            {task.prompt}
+                          </div>
+                          <div className="absolute -top-1 left-4 w-2 h-2 bg-gray-800 rotate-45"></div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 min-w-0">
+                    <span className="break-words max-w-full">模型: {task.model}</span>
+                    <span className="break-words max-w-full">用户: {task.username}</span>
+                    <span className="break-words max-w-full">时间: {timeFormatter ? timeFormatter.format(new Date(task.create_time)) : new Date(task.create_time).toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${statusDisplay.color}`}>
+                {statusDisplay.text}
+              </span>
+              <button
+                onClick={() => openTaskDetails(task.id)}
+                className="ml-3 px-3 py-1 text-xs text-black border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                {isExpanded ? '收起详情' : '查看详情'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {isExpanded && (
+          <div className="mt-4 border-t border-gray-100 pt-4">
+            {isLoading && (
+              <div className="flex items-center text-sm text-gray-500">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
+                正在加载详情...
+              </div>
+            )}
+            {details && (
+              <>
+                {details.input_files?.length > 0 && (
+                  <div className="mb-3">
+                    <div className="text-sm text-gray-600 mb-2">输入图片</div>
+                    <RowImageDisplay images={details.input_files} />
+                  </div>
+                )}
+                {task.status === TaskStatus.FAILED && task.error_message && (
+                  <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-600 break-words whitespace-pre-wrap">
+                    <span className="font-medium">错误信息:</span> {task.error_message}
+                  </div>
+                )}
+                {details.output_files?.length > 0 && (
+                  <div>
+                    <div className="text-sm text-gray-600 mb-2">输出图片</div>
+                    <ImagePreview
+                      urlImages={convertTaskFilesToMediaFiles(details.output_files)}
+                      title=""
+                      showDownload={true}
+                      showBatchDownload={false}
+                      gridCols="grid-cols-1 sm:grid-cols-1 lg:grid-cols-4"
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  })
 
   // 初始加载和依赖项变化时的处理
   useEffect(() => {
@@ -448,114 +590,24 @@ export default function TaskHistory({
           )}
           
           {!loading && !error && tasks.length > 0 && Array.isArray(tasks) && tasks.map((task) => (
-            <div
+            <TaskItem
               key={task.id}
-              className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-6"
-            >
-              {/* 任务信息头部 */}
-              <div className="mb-2">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    {/* 提示词与模型信息上下排列在同一容器 */}
-                    <div className="flex items-start gap-3 mb-3 min-w-0">
-                      <div className="flex-1 min-w-0">
-                        {task.prompt && (
-                          <div className="relative group min-w-0">
-                            <p className="text-sm text-gray-600 overflow-hidden">
-                              <span className="truncate block w-full">
-                                {task.prompt}
-                              </span>
-                            </p>
-                            {/* Hover时显示完整提示词 */}
-                            <div className="absolute left-0 top-full mt-1 p-3 bg-gray-800 text-white text-sm rounded-lg shadow-lg z-20 max-w-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none">
-                              <div className="whitespace-pre-wrap break-words">
-                                {task.prompt}
-                              </div>
-                              {/* 小箭头 */}
-                              <div className="absolute -top-1 left-4 w-2 h-2 bg-gray-800 rotate-45"></div>
-                            </div>
-                          </div>
-                        )}
-                        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 min-w-0">
-                          <span className="break-words max-w-full">模型: {task.model}</span>
-                          <span className="break-words max-w-full">用户: {task.username}</span>
-                          <span className="break-words max-w-full">时间: {new Date(task.create_time).toLocaleString()}</span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                  </div>
-                  <div className="flex-shrink-0">
-                    {(() => {
-                      const statusDisplay = getStatusDisplay(task.status);
-                      return (
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${statusDisplay.color}`}>
-                          {statusDisplay.text}
-                        </span>
-                      );
-                    })()}
-                    <button
-                      onClick={() => openTaskDetails(task.id)}
-                      className="ml-3 px-3 py-1 text-xs text-black border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      {expandedTaskId === task.id ? '收起详情' : '查看详情'}
-                    </button>
-                  </div>
-                </div>
-                
-              </div>
-              {/* 详情展开区域：按需加载并展示输入/输出图片 */}
-              {expandedTaskId === task.id && (
-                <div className="mt-4 border-t border-gray-100 pt-4">
-                  {detailsLoadingId === task.id && (
-                    <div className="flex items-center text-sm text-gray-500">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
-                      正在加载详情...
-                    </div>
-                  )}
-                  {detailsByTaskId[task.id] && (
-                    <>
-                      {detailsByTaskId[task.id].input_files?.length > 0 && (
-                        <div className="mb-3">
-                          <div className="text-sm text-gray-600 mb-2">输入图片</div>
-                          <RowImageDisplay images={detailsByTaskId[task.id].input_files} />
-                        </div>
-                      )}
-                      
-                      {/* 错误信息显示：仅在展开详情时展示，并置于输入图片下方 */}
-                      {task.status === TaskStatus.FAILED && task.error_message && (
-                        <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-600 break-words whitespace-pre-wrap">
-                          <span className="font-medium">错误信息:</span> {task.error_message}
-                        </div>
-                      )}
-                      
-                      {detailsByTaskId[task.id].output_files?.length > 0 && (
-                        <div>
-                          <div className="text-sm text-gray-600 mb-2">输出图片</div>
-                          <ImagePreview
-                            urlImages={convertTaskFilesToMediaFiles(detailsByTaskId[task.id].output_files)}
-                            title=""
-                            showDownload={true}
-                            showBatchDownload={false}
-                            gridCols="grid-cols-1 sm:grid-cols-1 lg:grid-cols-4"
-                          />
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-
-            </div>
+              task={task}
+              isExpanded={expandedTaskId === task.id}
+              details={detailsByTaskId[task.id]}
+              isLoading={detailsLoadingId === task.id}
+              openTaskDetails={openTaskDetails}
+              timeFormatter={timeFormatter}
+            />
           ))}
           {/* 分页控件 */}
           {!loading && !error && pagination.total_pages >= 1 && (
-            <div className="flex items-center justify-between border-t border-gray-200 pt-6">
-              <div className="text-sm text-gray-500">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 pt-6">
+              <div className="text-sm text-gray-500 min-w-0">
                 显示第 {((pagination.current_page - 1) * pagination.page_size) + 1} - {Math.min(pagination.current_page * pagination.page_size, pagination.total_count)} 条，共 {pagination.total_count} 条记录
               </div>
               
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
                 {/* 上一页按钮 */}
                 <button
                   onClick={() => {
@@ -570,7 +622,7 @@ export default function TaskHistory({
                 </button>
                 
                 {/* 页码按钮 */}
-                <div className="flex items-center gap-1">
+                <div className="flex flex-wrap items-center gap-1 min-w-0">
                   {(() => {
                     const pages = []
                     const currentPage = pagination.current_page

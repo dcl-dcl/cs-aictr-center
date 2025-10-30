@@ -5,6 +5,7 @@ import { withAuth, AuthenticatedRequest } from '@/lib/auth/auth-middleware'
 
 async function handleGET(request: AuthenticatedRequest) {
   try {
+    const DEBUG_API = process.env.DEBUG_API === '1'
     const { searchParams } = new URL(request.url)
     const path = searchParams.get('path')
     const tab = searchParams.get('tab')
@@ -39,6 +40,7 @@ async function handleGET(request: AuthenticatedRequest) {
       }, { status: 400 })
     }
     
+    if (DEBUG_API) console.time('[api.history] getTaskHistorySummary')
     const result = await getTaskHistorySummary({
       path,
       tab: tab || undefined,
@@ -48,6 +50,11 @@ async function handleGET(request: AuthenticatedRequest) {
       startDate: startDate || undefined,
       endDate: endDate || undefined
     })
+    if (DEBUG_API) {
+      console.timeEnd('[api.history] getTaskHistorySummary')
+      console.debug('[api.history] params', { path, tab, username, page, page_size, startDate, endDate })
+      console.debug('[api.history] result', { total: result.total, tasks_len: result.tasks.length })
+    }
     
     const total_pages = Math.ceil(result.total / page_size)
     

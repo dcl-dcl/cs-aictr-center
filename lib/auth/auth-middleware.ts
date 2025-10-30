@@ -21,15 +21,26 @@ export async function verifyAuth(request: NextRequest): Promise<{ user: any; err
 
   try {
     const decoded = verifyJwt<JwtPayload>(token);
-    
-    // 从数据库查询用户信息（login 签发的是 { id, username, email }）
-    const user = await getUserById(Number(decoded.id));
+    // 默认信任 JWT 载荷中的用户信息，避免每次请求都查询数据库。
+    // 如需强一致性校验（例如用户被禁用时立即失效），可设置环境变量 AUTH_VERIFY_DB=1 开启数据库查询。
+    const useDbVerify = (process.env.AUTH_VERIFY_DB === '1');
 
+    if (!useDbVerify) {
+      return {
+        user: {
+          id: Number(decoded.id),
+          username: decoded.username,
+          email: decoded.email
+        }
+      };
+    }
+
+    // 开启强校验时，按用户ID查询数据库以确保用户存在且状态有效
+    const user = await getUserById(Number(decoded.id));
     if (!user) {
       return { user: null, error: '用户不存在' };
     }
-
-    return { 
+    return {
       user: {
         id: Number(user.id),
         username: user.username,

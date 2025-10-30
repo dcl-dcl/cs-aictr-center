@@ -498,6 +498,7 @@ export async function insertTaskFiles(filesData: Array<{
  */
 export async function getTaskHistorySummary(params: TaskHistoryRequest): Promise<{ tasks: GenerationTask[], total: number }> {
   const { path, tab, username, page, page_size, startDate, endDate } = params;
+  const DEBUG_SQL = process.env.DEBUG_SQL === '1'
 
   // 构建task_from_tab查询条件
   let taskFromTab = path;
@@ -533,7 +534,9 @@ export async function getTaskHistorySummary(params: TaskHistoryRequest): Promise
     FROM aictr_generation_tasks 
     WHERE ${whereClause}
   `;
+  if (DEBUG_SQL) console.time('[sql.history] count')
   const countResult = await query<{ total: number }>(countSql, queryParams);
+  if (DEBUG_SQL) console.timeEnd('[sql.history] count')
   const total = countResult[0]?.total || 0;
   if (total === 0) {
     return { tasks: [], total: 0 };
@@ -562,7 +565,12 @@ export async function getTaskHistorySummary(params: TaskHistoryRequest): Promise
     LIMIT ? OFFSET ?
   `;
   const taskParams = [...queryParams, page_size, offset];
+  if (DEBUG_SQL) console.time('[sql.history] select_page')
   const rows = await query<RawTaskData>(taskSql, taskParams);
+  if (DEBUG_SQL) {
+    console.timeEnd('[sql.history] select_page')
+    console.debug('[sql.history] pagination', { total, page, page_size, offset })
+  }
 
   // 组装为空文件的任务对象
   const tasks: GenerationTask[] = rows.map(row => ({
