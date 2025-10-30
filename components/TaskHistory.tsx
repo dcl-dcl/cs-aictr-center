@@ -1,6 +1,9 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { List, Card, Button, Tag, Space, Popover, DatePicker, Skeleton, Empty, Alert, Tooltip, Pagination, Segmented } from 'antd'
+import { ReloadOutlined, CalendarOutlined } from '@ant-design/icons'
+import dayjs from 'dayjs'
 
 // 全局请求缓存，防止重复API调用
 const pendingRequests = new Map<string, Promise<any>>()
@@ -9,6 +12,7 @@ import { MediaFile } from '@/types/BaseType'
 import { ImagePreview } from './MediaPreview'
 import RowImageDisplay from './RowImageDisplay'
 import { apiFetch } from '@/lib/utils/api-client'
+const { RangePicker } = DatePicker
 
 interface TaskHistoryProps {
   path: string
@@ -67,6 +71,19 @@ function getStatusDisplay(status: TaskStatus) {
         color: 'text-gray-600 bg-gray-50 border-gray-200',
         text: '未知'
       }
+  }
+}
+function getStatusTagColor(status: TaskStatus): string {
+  switch (status) {
+    case TaskStatus.COMPLETED:
+      return 'green'
+    case TaskStatus.PROCESSING:
+      return 'orange'
+    case TaskStatus.FAILED:
+      return 'red'
+    case TaskStatus.PENDING:
+    default:
+      return 'default'
   }
 }
 
@@ -301,34 +318,28 @@ export default function TaskHistory({
     const statusDisplay = getStatusDisplay(task.status)
 
     return (
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-6">
-        <div className="mb-2">
-          <div className="flex flex-wrap items-start justify-between gap-4">
+      <Card
+        size="small"
+        variant="outlined"
+        className="shadow-sm hover:shadow-md transition-shadow w-full"
+        style={{ width: '100%', minHeight: isExpanded ? undefined : 100 }}
+        styles={{ body: { padding: 12 } }}
+      >
+        <div className="mb-1">
+          <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <div className="flex items-start gap-3 mb-3 min-w-0">
+              <div className="flex items-start gap-2 mb-1 min-w-0">
                 <div className="flex-1 min-w-0">
                   {task.prompt && (
-                    <div
-                      className="relative min-w-0"
-                      onMouseEnter={() => setHovered(true)}
-                      onMouseLeave={() => setHovered(false)}
-                    >
+                    <Tooltip title={<div className="whitespace-pre-wrap break-words">{task.prompt}</div>} placement="top">
                       <p className="text-sm text-gray-600 overflow-hidden">
                         <span className="truncate block w-full">
                           {task.prompt}
                         </span>
                       </p>
-                      {hovered && (
-                        <div className="absolute left-0 top-full mt-1 p-3 bg-gray-800 text-white text-sm rounded-lg shadow-lg z-20 max-w-lg transition-all duration-200">
-                          <div className="whitespace-pre-wrap break-words">
-                            {task.prompt}
-                          </div>
-                          <div className="absolute -top-1 left-4 w-2 h-2 bg-gray-800 rotate-45"></div>
-                        </div>
-                      )}
-                    </div>
+                    </Tooltip>
                   )}
-                  <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 min-w-0">
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 min-w-0">
                     <span className="break-words max-w-full">模型: {task.model}</span>
                     <span className="break-words max-w-full">用户: {task.username}</span>
                     <span className="break-words max-w-full">时间: {timeFormatter ? timeFormatter.format(new Date(task.create_time)) : new Date(task.create_time).toLocaleString()}</span>
@@ -337,43 +348,33 @@ export default function TaskHistory({
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap min-w-0">
-              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${statusDisplay.color}`}>
-                {statusDisplay.text}
-              </span>
-              <button
-                onClick={() => openTaskDetails(task.id)}
-                className="ml-3 px-3 py-1 text-xs text-black border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
+              <Tag color={getStatusTagColor(task.status)}>{statusDisplay.text}</Tag>
+              <Button onClick={() => openTaskDetails(task.id)} size="small">
                 {isExpanded ? '收起详情' : '查看详情'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
 
         {isExpanded && (
-          <div className="mt-4 border-t border-gray-100 pt-4">
+          <div className="mt-3 border-t border-gray-100 pt-3">
             {isLoading && (
-              <div className="flex items-center text-sm text-gray-500">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
-                正在加载详情...
-              </div>
+              <Skeleton active paragraph={{ rows: 2 }} />
             )}
             {details && (
               <>
                 {details.input_files?.length > 0 && (
-                  <div className="mb-3">
-                    <div className="text-sm text-gray-600 mb-2">输入图片</div>
+                  <div className="mb-2">
+                    <div className="text-sm text-gray-600 mb-1">输入图片</div>
                     <RowImageDisplay images={details.input_files} />
                   </div>
                 )}
                 {task.status === TaskStatus.FAILED && task.error_message && (
-                  <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-600 break-words whitespace-pre-wrap">
-                    <span className="font-medium">错误信息:</span> {task.error_message}
-                  </div>
+                  <Alert style={{ marginBottom: 8 }} message={<span className="break-words whitespace-pre-wrap">错误信息: {task.error_message}</span>} type="error" showIcon />
                 )}
                 {details.output_files?.length > 0 && (
                   <div>
-                    <div className="text-sm text-gray-600 mb-2">输出图片</div>
+                    <div className="text-sm text-gray-600 mb-1">输出图片</div>
                     <ImagePreview
                       urlImages={convertTaskFilesToMediaFiles(details.output_files)}
                       title=""
@@ -387,7 +388,7 @@ export default function TaskHistory({
             )}
           </div>
         )}
-      </div>
+      </Card>
     )
   })
 
@@ -429,119 +430,73 @@ export default function TaskHistory({
         {/* 标题和筛选器 */}
         <div className="space-y-4">
           {/* 时间范围筛选器（固定在顶部） */}
-          <div className="sticky top-0 z-20 bg-white border-b border-gray-200 flex items-center justify-end mb-4 min-w-0">
-            <div className="flex items-center gap-3 flex-wrap">
-              {/* 时间下拉菜单 */}
-               <div className="relative date-filter-dropdown">
-                <button
-                  onClick={() => setShowDateFilter(!showDateFilter)}
-                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <span className="text-sm text-gray-700">时间</span>
-                  <svg className={`w-4 h-4 text-gray-500 transition-transform ${showDateFilter ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                
-                {/* 下拉菜单内容 */}
-                {showDateFilter && (
-                  <div className="absolute top-full right-0 mt-1 w-72 sm:w-80 max-w-[90vw] bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-                    <div className="p-4">
-                      {/* 日期范围输入 */}
-                      <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 mb-4">
-                        <input
-                          type="date"
-                          value={dateRange.startDate}
-                          onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm  text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="开始日期"
+          <div className="sticky top-0 z-20 bg-white border-b border-gray-200 flex items-center justify-end mb-4 min-w-0 pb-2">
+            <Space size={8} wrap>
+              <div className="relative date-filter-dropdown">
+                <Popover
+                  content={
+                    <div style={{ width: 320 }}>
+                      <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                        <RangePicker
+                          style={{ width: '100%' }}
+                          allowClear
+                          value={
+                            dateRange.startDate && dateRange.endDate
+                              ? [dayjs(dateRange.startDate), dayjs(dateRange.endDate)]
+                              : null
+                          }
+                          onChange={(values) => {
+                            const start = values?.[0]?.format('YYYY-MM-DD') || ''
+                            const end = values?.[1]?.format('YYYY-MM-DD') || ''
+                            setDateRange({ startDate: start, endDate: end })
+                          }}
                         />
-                        <span className="text-gray-400">—</span>
-                        <input
-                          type="date"
-                          value={dateRange.endDate}
-                          onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="结束日期"
+                        <Segmented
+                          style={{ width: '100%' }}
+                          options={[
+                            { label: '全部', value: 'all' },
+                            { label: '近7天', value: '7' },
+                            { label: '近30天', value: '30' },
+                            { label: '近90天', value: '90' }
+                          ]}
+                          onChange={(val) => {
+                            const endDate = new Date()
+                            if (val === 'all') {
+                              setDateRange({ startDate: '', endDate: '' })
+                              setShowDateFilter(false)
+                              return
+                            }
+                            const days = Number(val as string)
+                            const startDate = new Date()
+                            startDate.setDate(startDate.getDate() - days)
+                            setDateRange({
+                              startDate: startDate.toISOString().split('T')[0],
+                              endDate: endDate.toISOString().split('T')[0]
+                            })
+                            setShowDateFilter(false)
+                          }}
                         />
-                      </div>
-                      
-                      {/* 快捷选择 */}
-                      <div className="space-y-1">
-                        <button
-                          onClick={() => {
-                            setDateRange({ startDate: '', endDate: '' })
-                            setShowDateFilter(false)
-                          }}
-                          className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-lg transition-colors"
-                        >
-                          全部
-                        </button>
-                        <button
-                          onClick={() => {
-                            const endDate = new Date()
-                            const startDate = new Date()
-                            startDate.setDate(startDate.getDate() - 7)
-                            setDateRange({
-                              startDate: startDate.toISOString().split('T')[0],
-                              endDate: endDate.toISOString().split('T')[0]
-                            })
-                            setShowDateFilter(false)
-                          }}
-                          className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-lg transition-colors"
-                        >
-                          最近一周
-                        </button>
-                        <button
-                          onClick={() => {
-                            const endDate = new Date()
-                            const startDate = new Date()
-                            startDate.setDate(startDate.getDate() - 30)
-                            setDateRange({
-                              startDate: startDate.toISOString().split('T')[0],
-                              endDate: endDate.toISOString().split('T')[0]
-                            })
-                            setShowDateFilter(false)
-                          }}
-                          className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-lg transition-colors"
-                        >
-                          最近一个月
-                        </button>
-                        <button
-                          onClick={() => {
-                            const endDate = new Date()
-                            const startDate = new Date()
-                            startDate.setDate(startDate.getDate() - 90)
-                            setDateRange({
-                              startDate: startDate.toISOString().split('T')[0],
-                              endDate: endDate.toISOString().split('T')[0]
-                            })
-                            setShowDateFilter(false)
-                          }}
-                          className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-lg transition-colors"
-                        >
-                          最近三个月
-                        </button>
-                      </div>
+                      </Space>
                     </div>
-                  </div>
-                )}
+                  }
+                  trigger="click"
+                  open={showDateFilter}
+                  onOpenChange={(open) => setShowDateFilter(open)}
+                  placement="bottomRight"
+                >
+                  <Button icon={<CalendarOutlined />}>{
+                    dateRange.startDate && dateRange.endDate
+                      ? `${dateRange.startDate} ~ ${dateRange.endDate}`
+                      : '时间'
+                  }</Button>
+                </Popover>
               </div>
-              
-              {/* 刷新按钮 */}
-              <button
+              <Button
                 onClick={() => fetchHistory(pagination.current_page, path, tab, page_size, dateRange)}
                 disabled={loading}
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <svg className={`w-4 h-4 text-gray-500 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              </button>
-            </div>
+                icon={<ReloadOutlined spin={loading} />}
+              />
+            </Space>
           </div>
         </div>
         
@@ -550,179 +505,66 @@ export default function TaskHistory({
           {loading && (
             <div className="space-y-4">
               {[...Array(3)].map((_, i) => (
-                <div key={i} className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
-                  <div className="h-4 bg-gray-200 rounded w-2/3 mb-3"></div>
-                  <div className="flex items-center gap-4">
-                    <div className="h-3 bg-gray-200 rounded w-24"></div>
-                    <div className="h-3 bg-gray-200 rounded w-16"></div>
-                    <div className="h-3 bg-gray-200 rounded w-32"></div>
-                  </div>
-                  <div className="mt-4 h-24 bg-gray-100 rounded"></div>
-                </div>
+                <Card key={i} variant="outlined">
+                  <Skeleton active paragraph={{ rows: 3 }} />
+                </Card>
               ))}
             </div>
           )}
           
           {!loading && error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="flex items-center">
-                <svg className="w-5 h-5 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="text-red-700">{error}</span>
-              </div>
-              <button
-                onClick={() => fetchHistory(1, path, tab, page_size, dateRange)}
-                className="mt-2 text-red-600 hover:text-red-800 text-sm underline"
-              >
-                重试
-              </button>
-            </div>
+            <Alert
+              message={error}
+              type="error"
+              action={
+                <Button size="small" onClick={() => fetchHistory(1, path, tab, page_size, dateRange)}>
+                  重试
+                </Button>
+              }
+              showIcon
+            />
           )}
           
           {!loading && !error && tasks.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              <svg className="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-              <p>暂无历史记录</p>
-            </div>
+            <Empty description="暂无历史记录" />
           )}
           
-          {!loading && !error && tasks.length > 0 && Array.isArray(tasks) && tasks.map((task) => (
-            <TaskItem
-              key={task.id}
-              task={task}
-              isExpanded={expandedTaskId === task.id}
-              details={detailsByTaskId[task.id]}
-              isLoading={detailsLoadingId === task.id}
-              openTaskDetails={openTaskDetails}
-              timeFormatter={timeFormatter}
+          {!loading && !error && tasks.length > 0 && Array.isArray(tasks) && (
+            <List
+              itemLayout="vertical"
+              style={{ width: '100%' }}
+              dataSource={tasks}
+              renderItem={(task) => (
+                <List.Item style={{ padding: 0, width: '100%', marginBottom: 8 }} className="p-0">
+                  <TaskItem
+                    key={task.id}
+                    task={task}
+                    isExpanded={expandedTaskId === task.id}
+                    details={detailsByTaskId[task.id]}
+                    isLoading={detailsLoadingId === task.id}
+                    openTaskDetails={openTaskDetails}
+                    timeFormatter={timeFormatter}
+                  />
+                </List.Item>
+              )}
             />
-          ))}
+          )}
           {/* 分页控件 */}
           {!loading && !error && pagination.total_pages >= 1 && (
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 pt-6">
               <div className="text-sm text-gray-500 min-w-0">
                 显示第 {((pagination.current_page - 1) * pagination.page_size) + 1} - {Math.min(pagination.current_page * pagination.page_size, pagination.total_count)} 条，共 {pagination.total_count} 条记录
               </div>
-              
-              <div className="flex flex-wrap items-center gap-2 min-w-0">
-                {/* 上一页按钮 */}
-                <button
-                  onClick={() => {
-                  const newPage = pagination.current_page - 1
+              <Pagination
+                current={pagination.current_page}
+                pageSize={pagination.page_size}
+                total={pagination.total_count}
+                showSizeChanger={false}
+                onChange={(newPage) => {
                   setPagination(prev => ({ ...prev, current_page: newPage }))
                   fetchHistory(newPage, path, tab, page_size, dateRange)
                 }}
-                  disabled={pagination.current_page <= 1}
-                  className="px-3 py-2 text-sm text-black border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  上一页
-                </button>
-                
-                {/* 页码按钮 */}
-                <div className="flex flex-wrap items-center gap-1 min-w-0">
-                  {(() => {
-                    const pages = []
-                    const currentPage = pagination.current_page
-                    const totalPages = pagination.total_pages
-                    
-                    // 显示逻辑：始终显示第1页，当前页附近的页码，最后一页
-                    let startPage = Math.max(1, currentPage - 2)
-                    let endPage = Math.min(totalPages, currentPage + 2)
-                    
-                    // 如果当前页靠近开始，显示更多后面的页码
-                    if (currentPage <= 3) {
-                      endPage = Math.min(totalPages, 5)
-                    }
-                    
-                    // 如果当前页靠近结束，显示更多前面的页码
-                    if (currentPage >= totalPages - 2) {
-                      startPage = Math.max(1, totalPages - 4)
-                    }
-                    
-                    // 添加第1页
-                    if (startPage > 1) {
-                      pages.push(
-                        <button
-                          key={1}
-                          onClick={() => {
-                            setPagination(prev => ({ ...prev, current_page: 1 }))
-                            fetchHistory(1, path, tab, page_size, dateRange)
-                          }}
-                          className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                          1
-                        </button>
-                      )
-                      
-                      if (startPage > 2) {
-                        pages.push(
-                          <span key="start-ellipsis" className="px-2 text-gray-400">...</span>
-                        )
-                      }
-                    }
-                    
-                    // 添加中间页码
-                    for (let i = startPage; i <= endPage; i++) {
-                      pages.push(
-                        <button
-                          key={i}
-                          onClick={() => {
-                        setPagination(prev => ({ ...prev, current_page: i }))
-                        fetchHistory(i, path, tab, page_size, dateRange)
-                      }}
-                          className={`px-3 py-2 text-sm border rounded-lg transition-colors ${
-                            i === currentPage
-                              ? 'bg-blue-500 text-white border-blue-500'
-                              : 'border-gray-300 hover:bg-gray-50'
-                          }`}
-                        >
-                          {i}
-                        </button>
-                      )
-                    }
-                    
-                    // 添加最后一页
-                    if (endPage < totalPages) {
-                      if (endPage < totalPages - 1) {
-                        pages.push(
-                          <span key="end-ellipsis" className="px-2 text-gray-400">...</span>
-                        )
-                      }
-                      
-                      pages.push(
-                        <button
-                          key={totalPages}
-                          onClick={() => {
-                            setPagination(prev => ({ ...prev, current_page: totalPages }))
-                            fetchHistory(totalPages, path, tab, page_size, dateRange)
-                          }}
-                          className="px-3 py-2 text-sm text-black border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                          {totalPages}
-                        </button>
-                      )
-                    }
-                    
-                    return pages
-                  })()}
-                </div>
-                
-                {/* 下一页按钮 */}
-                <button
-                  onClick={() => {
-                  const newPage = pagination.current_page + 1
-                  setPagination(prev => ({ ...prev, current_page: newPage }))
-                  fetchHistory(newPage, path, tab, page_size, dateRange)
-                }}
-                  disabled={pagination.current_page >= pagination.total_pages}
-                  className="px-3 py-2 text-sm text-black border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  下一页
-                </button>
-              </div>
+              />
             </div>
           )}
         </div>
