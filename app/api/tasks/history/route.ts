@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getTaskHistory } from '@/lib/repositories/task-repo'
+import { getTaskHistorySummary } from '@/lib/repositories/task-repo'
 import { TaskHistoryResponse } from '@/types/TaskType'
 import { withAuth, AuthenticatedRequest } from '@/lib/auth/auth-middleware'
 
@@ -39,7 +39,7 @@ async function handleGET(request: AuthenticatedRequest) {
       }, { status: 400 })
     }
     
-    const result = await getTaskHistory({
+    const result = await getTaskHistorySummary({
       path,
       tab: tab || undefined,
       username: username || undefined,

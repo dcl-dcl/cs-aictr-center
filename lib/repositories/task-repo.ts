@@ -305,7 +305,7 @@ export async function getTaskHistory(params: TaskHistoryRequest): Promise<{ task
       preview_url,
       aspect_ratio,
       update_time as file_update_time
-    FROM aictr_task_files
+    FROM aictr_generation_tasks
     WHERE task_id IN (${taskIds.map(() => '?').join(',')}) AND del_flag = 0
     ORDER BY create_time ASC
   `;
@@ -491,4 +491,147 @@ export async function insertTaskFiles(filesData: Array<{
     insertIds.push(result.insertId + i);
   }
   return insertIds;
+}
+
+/**
+ * 仅分页查询 aictr_generation_tasks 基本信息（不加载文件）
+ */
+export async function getTaskHistorySummary(params: TaskHistoryRequest): Promise<{ tasks: GenerationTask[], total: number }> {
+  const { path, tab, username, page, page_size, startDate, endDate } = params;
+
+  // 构建task_from_tab查询条件
+  let taskFromTab = path;
+  if (tab) {
+    taskFromTab = `${path}?tab=${tab}`;
+  }
+
+  // 构建WHERE条件
+  const whereConditions: string[] = ['del_flag = 0', 'task_from_tab = ?'];
+  const queryParams: any[] = [taskFromTab];
+
+  if (username) {
+    whereConditions.push('username = ?');
+    queryParams.push(username);
+  }
+
+  // 添加时间范围筛选
+  if (startDate) {
+    whereConditions.push('create_time >= CONCAT(?, \" 00:00:00\")');
+    queryParams.push(startDate);
+  }
+
+  if (endDate) {
+    whereConditions.push('create_time <= CONCAT(?, \" 23:59:59\")');
+    queryParams.push(endDate);
+  }
+
+  const whereClause = whereConditions.join(' AND ');
+
+  // 第一步：查询总数
+  const countSql = `
+    SELECT COUNT(*) as total 
+    FROM aictr_generation_tasks 
+    WHERE ${whereClause}
+  `;
+  const countResult = await query<{ total: number }>(countSql, queryParams);
+  const total = countResult[0]?.total || 0;
+  if (total === 0) {
+    return { tasks: [], total: 0 };
+  }
+
+  // 第二步：分页查询任务基本信息
+  const offset = (page - 1) * page_size;
+  const taskSql = `
+    SELECT 
+      id,
+      project_id,
+      username,
+      task_from_tab,
+      prompt,
+      prompt_trans,
+      model,
+      status,
+      error_message,
+      create_username,
+      create_time,
+      update_time,
+      del_flag
+    FROM aictr_generation_tasks
+    WHERE ${whereClause}
+    ORDER BY create_time DESC
+    LIMIT ? OFFSET ?
+  `;
+  const taskParams = [...queryParams, page_size, offset];
+  const rows = await query<RawTaskData>(taskSql, taskParams);
+
+  // 组装为空文件的任务对象
+  const tasks: GenerationTask[] = rows.map(row => ({
+    id: row.id,
+    project_id: row.project_id,
+    username: row.username,
+    task_from_tab: row.task_from_tab,
+    prompt: row.prompt,
+    prompt_trans: row.prompt_trans,
+    model: row.model,
+    status: row.status as any,
+    error_message: row.error_message,
+    create_username: row.create_username,
+    create_time: row.create_time,
+    update_time: row.update_time,
+    del_flag: row.del_flag,
+    input_files: [],
+    output_files: []
+  }));
+
+  return { tasks, total };
+}
+
+/**
+ * 根据 task_id 查询任务的输入/输出文件，并刷新过期的预览链接
+ */
+export async function getTaskFilesByTaskId(taskId: number): Promise<{ input_files: TaskFile[]; output_files: TaskFile[] }>{
+  // 查询当前任务的文件记录
+  const fileSql = `
+    SELECT 
+      id as file_id,
+      task_id,
+      file_role,
+      file_name,
+      file_mime_type,
+      gcs_uri,
+      preview_url,
+      aspect_ratio,
+      create_username as file_create_username,
+      create_time as file_create_time,
+      update_time as file_update_time,
+      del_flag as file_del_flag
+    FROM aictr_task_files
+    WHERE task_id = ? AND del_flag = 0
+    ORDER BY create_time ASC
+  `;
+  const fileRows = await query<RawFileData>(fileSql, [taskId]);
+
+  // 刷新过期的预览链接
+  const refreshedPreviewMap = await refreshExpiredPreviewUrls(fileRows);
+
+  // 转换为 TaskFile
+  const files: TaskFile[] = fileRows.map(row => ({
+    id: row.file_id,
+    task_id: row.task_id,
+    file_role: row.file_role as FileRole,
+    file_name: row.file_name,
+    file_mime_type: row.file_mime_type,
+    gcs_uri: row.gcs_uri,
+    preview_url: refreshedPreviewMap.get(row.file_id) ?? row.preview_url,
+    aspect_ratio: row.aspect_ratio,
+    create_username: row.file_create_username,
+    create_time: row.file_create_time,
+    update_time: row.file_update_time,
+    del_flag: row.file_del_flag
+  }));
+
+  return {
+    input_files: files.filter(f => f.file_role === FileRole.INPUT),
+    output_files: files.filter(f => f.file_role === FileRole.OUTPUT)
+  };
 }

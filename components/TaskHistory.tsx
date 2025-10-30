@@ -7,7 +7,7 @@ const pendingRequests = new Map<string, Promise<any>>()
 import { TaskFile, TaskStatus, GenerationTask } from '@/types/TaskType'
 import { MediaFile } from '@/types/BaseType'
 import { ImagePreview } from './MediaPreview'
-import StackedImageDisplay from './StackedImageDisplay'
+import RowImageDisplay from './RowImageDisplay'
 import { apiFetch } from '@/lib/utils/api-client'
 
 interface TaskHistoryProps {
@@ -104,6 +104,10 @@ export default function TaskHistory({
     total_count: 0,
     total_pages: 0
   })
+  // 详情展开与数据缓存
+  const [expandedTaskId, setExpandedTaskId] = useState<number | null>(null)
+  const [detailsByTaskId, setDetailsByTaskId] = useState<Record<number, { input_files: TaskFile[]; output_files: TaskFile[] }>>({})
+  const [detailsLoadingId, setDetailsLoadingId] = useState<number | null>(null)
   
   const fetchHistory = useCallback(async (
     currentPage: number = 1,
@@ -220,6 +224,30 @@ export default function TaskHistory({
       throw error;
     }
   }, [path, tab, page_size, dateRange])
+
+  // 展开/收起任务详情，并在展开时按需拉取图片数据
+  const openTaskDetails = useCallback(async (taskId: number) => {
+    if (expandedTaskId === taskId) {
+      setExpandedTaskId(null)
+      return
+    }
+    setExpandedTaskId(taskId)
+    // 已有缓存则不再请求
+    if (detailsByTaskId[taskId]) return
+    try {
+      setDetailsLoadingId(taskId)
+      const resp = await apiFetch(`/api/tasks/detail?task_id=${taskId}`)
+      const result = await resp.json()
+      if (result.success && result.data) {
+        const { input_files = [], output_files = [] } = result.data
+        setDetailsByTaskId(prev => ({ ...prev, [taskId]: { input_files, output_files } }))
+      }
+    } catch (e) {
+      console.error('获取任务详情失败:', e)
+    } finally {
+      setDetailsLoadingId(null)
+    }
+  }, [expandedTaskId, detailsByTaskId])
 
   // 初始加载和依赖项变化时的处理
   useEffect(() => {
@@ -428,18 +456,10 @@ export default function TaskHistory({
             >
               {/* 任务信息头部 */}
               <div className="mb-2">
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    {/* 输入图片堆叠显示在提示词上方 */}
-                    {/* 输入图片和提示词并排展示 */}
+                    {/* 提示词与模型信息上下排列在同一容器 */}
                     <div className="flex items-start gap-3 mb-3 min-w-0">
-                      {/* 输入图片 */}
-                      {task.input_files && task.input_files.length > 0 && (
-                        <div className="flex-shrink-0">
-                          <StackedImageDisplay  images={task.input_files}/>
-                        </div>
-                      )}
-                      {/* 提示词与模型信息上下排列在同一容器 */}
                       <div className="flex-1 min-w-0">
                         {task.prompt && (
                           <div className="relative group min-w-0">
@@ -458,10 +478,10 @@ export default function TaskHistory({
                             </div>
                           </div>
                         )}
-                        <div className="mt-1 flex items-center gap-4 text-xs text-gray-500">
-                          <span>模型: {task.model}</span>
-                          <span>用户: {task.username}</span>
-                          <span>时间: {new Date(task.create_time).toLocaleString()}</span>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 min-w-0">
+                          <span className="break-words max-w-full">模型: {task.model}</span>
+                          <span className="break-words max-w-full">用户: {task.username}</span>
+                          <span className="break-words max-w-full">时间: {new Date(task.create_time).toLocaleString()}</span>
                         </div>
                       </div>
                     </div>
@@ -476,30 +496,59 @@ export default function TaskHistory({
                         </span>
                       );
                     })()}
+                    <button
+                      onClick={() => openTaskDetails(task.id)}
+                      className="ml-3 px-3 py-1 text-xs text-black border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      {expandedTaskId === task.id ? '收起详情' : '查看详情'}
+                    </button>
                   </div>
                 </div>
                 
                 {/* 错误信息显示 */}
                 {task.status === TaskStatus.FAILED && task.error_message && (
-                  <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-600">
+                  <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-600 break-words whitespace-pre-wrap">
                     <span className="font-medium">错误信息:</span> {task.error_message}
                   </div>
                 )}
               </div>
-              
-              {/* 输出图片展示区域 */}
-              {task.output_files && task.output_files.length > 0 && (
-                <div>
-                  <ImagePreview 
-                    urlImages={convertTaskFilesToMediaFiles(task.output_files)}
-                    title=""
-                    showDownload={true}
-                    showBatchDownload={false}
-                    gridCols="grid-cols-1 sm:grid-cols-1 lg:grid-cols-4"
-                  />
+              {/* 详情展开区域：按需加载并展示输入/输出图片 */}
+              {expandedTaskId === task.id && (
+                <div className="mt-4 border-t border-gray-100 pt-4">
+                  {detailsLoadingId === task.id && (
+                    <div className="flex items-center text-sm text-gray-500">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
+                      正在加载详情...
+                    </div>
+                  )}
+                  {detailsByTaskId[task.id] && (
+                    <>
+                      {detailsByTaskId[task.id].input_files?.length > 0 && (
+                        <div className="mb-3">
+                          <div className="text-sm text-gray-600 mb-2">输入图片</div>
+                          <RowImageDisplay images={detailsByTaskId[task.id].input_files} />
+                        </div>
+                      )}
+                      {detailsByTaskId[task.id].output_files?.length > 0 && (
+                        <div>
+                          <div className="text-sm text-gray-600 mb-2">输出图片</div>
+                          <ImagePreview
+                            urlImages={convertTaskFilesToMediaFiles(detailsByTaskId[task.id].output_files)}
+                            title=""
+                            showDownload={true}
+                            showBatchDownload={false}
+                            gridCols="grid-cols-1 sm:grid-cols-1 lg:grid-cols-4"
+                          />
+                        </div>
+                      )}
+                      {(!detailsByTaskId[task.id].input_files?.length && !detailsByTaskId[task.id].output_files?.length) && (
+                        <div className="text-sm text-gray-500">该任务没有图片文件</div>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
-              
+
             </div>
           ))}
           {/* 分页控件 */}
