@@ -99,8 +99,6 @@ export default function TaskHistory({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showDateFilter, setShowDateFilter] = useState(false)
-  // 移除全局 hover 状态，避免鼠标悬停导致整个列表重渲染
-  
   // 时间格式化器，减少重复计算成本
   const timeFormatter = useMemo(() => {
     try {
@@ -157,19 +155,6 @@ export default function TaskHistory({
       actualPageSize,
       actualDateRange
     });
-
-    // 检查是否有相同的请求正在进行
-    if (pendingRequests.has(requestKey)) {
-      console.log(`[TaskHistory Debug] fetchHistory using cached request:`, { requestKey });
-      try {
-        const result = await pendingRequests.get(requestKey);
-        return result;
-      } catch (error) {
-        // 如果缓存的请求失败，移除缓存并重新请求
-        pendingRequests.delete(requestKey);
-      }
-    }
-
     console.log(`[TaskHistory Debug] fetchHistory called:`, {
       page: currentPage,
       actualPath,
@@ -180,90 +165,85 @@ export default function TaskHistory({
       requestKey
     });
 
+    // 统一设置加载状态，确保每个组件实例都能正确显示loading
     setLoading(true);
     setError(null);
 
-    // 创建请求Promise并缓存
-    const requestPromise = (async () => {
-      // 使用传入的参数或当前状态值
-      const usePath = currentPath ?? path
-      const useTab = currentTab ?? tab
-      const usePageSize = currentPageSize ?? page_size
-      const useDateRange = currentDateRange ?? dateRange
-      
-      try {
-        const params = new URLSearchParams({
-          path: usePath,
-          ...(useTab && { tab: useTab }),
-          page: currentPage.toString(),
-          page_size: usePageSize.toString(),
-          startDate: useDateRange.startDate,
-          endDate: useDateRange.endDate
-        })
-        
+    // 生成请求参数
+    const usePath = currentPath ?? path
+    const useTab = currentTab ?? tab
+    const usePageSize = currentPageSize ?? page_size
+    const useDateRange = currentDateRange ?? dateRange
+    const params = new URLSearchParams({
+      path: usePath,
+      ...(useTab && { tab: useTab }),
+      page: currentPage.toString(),
+      page_size: usePageSize.toString(),
+      startDate: useDateRange.startDate,
+      endDate: useDateRange.endDate
+    })
+
+    // 使用仅返回结果的数据请求Promise进行缓存，避免把 setState 绑定到首个发起者组件实例
+    let requestPromise = pendingRequests.get(requestKey)
+    if (!requestPromise) {
+      requestPromise = (async () => {
         console.time('TaskHistory: fetch+parse')
         const response = await apiFetch(`/api/tasks/history?${params}`)
         const result = await response.json()
         console.timeEnd('TaskHistory: fetch+parse')
-        
-        if (result.success) {
-          // 检查是否是新版本分页API响应（包含tasks字段）
-          if (result.data && typeof result.data === 'object' && 'tasks' in result.data) {
-            // 新版本API响应格式
-            const incomingTasks = Array.isArray(result.data.tasks) ? result.data.tasks : []
-            const avgPromptLen = incomingTasks.length > 0 ? (
-              incomingTasks.reduce((sum: number, t: any) => sum + (t?.prompt?.length || 0), 0) / incomingTasks.length
-            ) : 0
-            console.log('[TaskHistory Perf] tasks_count:', incomingTasks.length, 'avg_prompt_len:', Math.round(avgPromptLen))
-            console.time('TaskHistory: state->render')
-            setTasks(incomingTasks)
-            setPagination({
-              current_page: result.data.page || 1,
-              page_size: result.data.page_size || usePageSize,
-              total_count: result.data.total || 0,
-              total_pages: result.data.total_pages || 0
-            })
-          } else {
-            // 旧版本API响应格式（向后兼容）
-            const incomingTasks = Array.isArray(result.data) ? result.data : []
-            const avgPromptLen = incomingTasks.length > 0 ? (
-              incomingTasks.reduce((sum: number, t: any) => sum + (t?.prompt?.length || 0), 0) / incomingTasks.length
-            ) : 0
-            console.log('[TaskHistory Perf] tasks_count:', incomingTasks.length, 'avg_prompt_len:', Math.round(avgPromptLen))
-            console.time('TaskHistory: state->render')
-            setTasks(incomingTasks)
-            setPagination(result.pagination || {
-              current_page: 1,
-              page_size: usePageSize,
-              total_count: 0,
-              total_pages: 0
-            })
-          }
-          return result;
-        } else {
-          setError(result.message || '获取历史记录失败')
-          throw new Error(result.message || '获取历史记录失败');
-        }
-      } catch (err) {
-        console.error('获取历史记录失败:', err)
-        setError('网络错误，请稍后重试')
-        throw err;
-      } finally {
-        setLoading(false)
-        // 清理缓存
-        pendingRequests.delete(requestKey);
-      }
-    })();
-
-    // 将Promise添加到缓存
-    pendingRequests.set(requestKey, requestPromise);
+        return result
+      })()
+      pendingRequests.set(requestKey, requestPromise)
+    } else {
+      console.log(`[TaskHistory Debug] fetchHistory using cached request:`, { requestKey })
+    }
 
     try {
-      return await requestPromise;
-    } catch (error) {
-      // 请求失败时也要清理缓存
-      pendingRequests.delete(requestKey);
-      throw error;
+      const result = await requestPromise
+      if (result.success) {
+        // 新/旧版本响应兼容处理
+        if (result.data && typeof result.data === 'object' && 'tasks' in result.data) {
+          const incomingTasks = Array.isArray(result.data.tasks) ? result.data.tasks : []
+          const avgPromptLen = incomingTasks.length > 0 ? (
+            incomingTasks.reduce((sum: number, t: any) => sum + (t?.prompt?.length || 0), 0) / incomingTasks.length
+          ) : 0
+          console.log('[TaskHistory Perf] tasks_count:', incomingTasks.length, 'avg_prompt_len:', Math.round(avgPromptLen))
+          console.time('TaskHistory: state->render')
+          setTasks(incomingTasks)
+          setPagination({
+            current_page: result.data.page || 1,
+            page_size: result.data.page_size || usePageSize,
+            total_count: result.data.total || 0,
+            total_pages: result.data.total_pages || 0
+          })
+        } else {
+          const incomingTasks = Array.isArray(result.data) ? result.data : []
+          const avgPromptLen = incomingTasks.length > 0 ? (
+            incomingTasks.reduce((sum: number, t: any) => sum + (t?.prompt?.length || 0), 0) / incomingTasks.length
+          ) : 0
+          console.log('[TaskHistory Perf] tasks_count:', incomingTasks.length, 'avg_prompt_len:', Math.round(avgPromptLen))
+          console.time('TaskHistory: state->render')
+          setTasks(incomingTasks)
+          setPagination(result.pagination || {
+            current_page: 1,
+            page_size: usePageSize,
+            total_count: 0,
+            total_pages: 0
+          })
+        }
+        return result
+      } else {
+        setError(result.message || '获取历史记录失败')
+        throw new Error(result.message || '获取历史记录失败')
+      }
+    } catch (err) {
+      console.error('获取历史记录失败:', err)
+      setError('网络错误，请稍后重试')
+      throw err
+    } finally {
+      setLoading(false)
+      // 清理缓存，避免长时间保留旧请求
+      pendingRequests.delete(requestKey)
     }
   }, [path, tab, page_size, dateRange])
   
