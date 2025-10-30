@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Upload, Input, Button, List, Card, message, theme, Tabs, Image } from 'antd';
+import { Input, Button, Card, message, theme, Tabs, Image } from 'antd';
 import { 
-  PictureOutlined, HistoryOutlined, CloudUploadOutlined,
-  ThunderboltOutlined, EyeOutlined, DownloadOutlined, ReloadOutlined,
- } from '@ant-design/icons';
+  HistoryOutlined, CloudUploadOutlined,
+  ThunderboltOutlined, EyeOutlined, ReloadOutlined,
+} from '@ant-design/icons';
 import CommonLayout from '@/components/ChildrenLayout';
 import ErrorModal from '@/components/ErrorModal';
 import TaskHistory from '@/components/TaskHistory';
