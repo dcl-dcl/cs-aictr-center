@@ -12,7 +12,6 @@ async function handleGET(request: AuthenticatedRequest) {
     const username = request.user?.username
     const pageStr = searchParams.get('page')
     const pageSizeStr = searchParams.get('page_size')
-    const limitStr = searchParams.get('limit') // 兼容旧版本API
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     
@@ -22,41 +21,6 @@ async function handleGET(request: AuthenticatedRequest) {
         message: '缺少必需参数: path'
       }, { status: 400 })
     }
-    
-    // 兼容旧版本API（使用limit参数）
-    if (limitStr && !pageStr && !pageSizeStr) {
-      const limit = parseInt(limitStr)
-      if (limit < 1 || limit > 100) {
-        return NextResponse.json({
-          success: false,
-          message: 'limit参数无效，范围应为1-100'
-        }, { status: 400 })
-      }
-      
-      const tasks = await getTaskHistory({
-        path,
-        tab: tab || undefined,
-        username: username || undefined,
-        page: pageStr ? parseInt(pageStr) : 1,
-        page_size: pageSizeStr ? parseInt(pageSizeStr) : 20,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined
-      })
-      // const tasks = await getTaskHistoryLegacy(
-      //   path, 
-      //   tab || undefined, 
-      //   username || undefined, 
-      //   limit,
-      //   startDate || undefined,
-      //   endDate || undefined
-      // )
-      
-      return NextResponse.json({
-        success: true,
-        data: tasks
-      })
-    }
-    
     // 新版本分页API
     const page = pageStr ? parseInt(pageStr) : 1
     const page_size = pageSizeStr ? parseInt(pageSizeStr) : 20

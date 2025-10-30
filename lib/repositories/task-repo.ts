@@ -1,5 +1,6 @@
 import { query } from '../db'
 import { GenerationTask, TaskFile, FileRole, TaskHistoryRequest, TaskStatus } from '@/types/TaskType'
+import { GCS } from '@/lib/gcp-clients/gcs'
 
 // 数据库原始任务数据类型
 interface RawTaskData {
@@ -48,6 +49,88 @@ interface RawTaskWithFiles extends RawTaskData {
   file_create_time?: string;
   file_update_time?: string;
   file_del_flag?: number;
+}
+
+
+/**
+ * 解析 GCS v4 Signed URL 的过期时间
+ * 使用查询参数中的 X-Goog-Date(UTC) 和 X-Goog-Expires(秒)
+ */
+function getSignedUrlExpiresAtMs(previewUrl?: string): number | null {
+  if (!previewUrl) return null;
+  try {
+    const url = new URL(previewUrl);
+    const xDate = url.searchParams.get('X-Goog-Date') || url.searchParams.get('x-goog-date');
+    const xExpires = url.searchParams.get('X-Goog-Expires') || url.searchParams.get('x-goog-expires') || url.searchParams.get('Expires') || url.searchParams.get('exp');
+    if (!xDate || !xExpires) return null;
+
+    const m = xDate.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/);
+    if (!m) return null;
+
+    const baseUtcMs = Date.UTC(
+      Number(m[1]),
+      Number(m[2]) - 1,
+      Number(m[3]),
+      Number(m[4]),
+      Number(m[5]),
+      Number(m[6])
+    );
+    const ttlSec = Number(xExpires);
+    if (!Number.isFinite(ttlSec)) return null;
+    return baseUtcMs + ttlSec * 1000;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 判断签名URL是否已过期（或无法解析），带少量时间偏移保护
+ */
+function isSignedUrlExpired(previewUrl?: string, skewSeconds: number = 60): boolean {
+  const expiresAtMs = getSignedUrlExpiresAtMs(previewUrl);
+  if (!expiresAtMs) return true;
+  return Date.now() >= (expiresAtMs - skewSeconds * 1000);
+}
+
+/**
+ * 刷新过期的预览链接：并发生成新签名URL，并一次性批量更新数据库
+ * 返回已更新的 { file_id -> new_preview_url } 映射，用于响应数据中替换
+ */
+async function refreshExpiredPreviewUrls(files: RawFileData[]): Promise<Map<number, string>> {
+  const expiredFiles = files.filter(f => isSignedUrlExpired(f.preview_url));
+  if (expiredFiles.length === 0) return new Map();
+
+  const gcs = new GCS();
+  // 并发生成新URL，避免串行耗时
+  const results = await Promise.all(
+    expiredFiles.map(async (f) => {
+      try {
+        const url = await gcs.gcsUriToSignedUrl(f.gcs_uri);
+        return { id: f.file_id, url };
+      } catch (e) {
+        // 如果生成失败，跳过该记录，不影响整体返回
+        return null;
+      }
+    })
+  );
+
+  const updates = results.filter((r): r is { id: number; url: string } => !!r);
+  if (updates.length === 0) return new Map();
+  
+  // 使用 CASE 批量更新，减少数据库交互次数，提升响应速度
+  const updateSql = `
+    UPDATE aictr_task_files
+    SET preview_url = CASE id ${updates.map(() => 'WHEN ? THEN ?').join(' ')} END,
+        update_time = CURRENT_TIMESTAMP
+    WHERE id IN (${updates.map(() => '?').join(',')})
+  `;
+  const params = [
+    ...updates.flatMap(u => [u.id, u.url]),
+    ...updates.map(u => u.id)
+  ];
+  await query(updateSql, params);
+
+  return new Map(updates.map(u => [u.id, u.url]));
 }
 
 
@@ -181,21 +264,17 @@ export async function getTaskHistory(params: TaskHistoryRequest): Promise<{ task
     FROM aictr_generation_tasks 
     WHERE ${whereClause}
   `;
-  
   const countResult = await query<{ total: number }>(countSql, queryParams);
   const total = countResult[0]?.total || 0;
-  
   // 如果没有数据，直接返回
   if (total === 0) {
     return { tasks: [], total: 0 };
   }
-  
   // 第二步：分页查询任务基本信息
   const offset = (page - 1) * page_size;
   const taskSql = `
     SELECT 
       id,
-      project_id,
       username,
       task_from_tab,
       prompt,
@@ -204,22 +283,14 @@ export async function getTaskHistory(params: TaskHistoryRequest): Promise<{ task
       status,
       error_message,
       create_username,
-      create_time,
-      update_time,
-      del_flag
+      create_time
     FROM aictr_generation_tasks
     WHERE ${whereClause}
     ORDER BY create_time DESC
     LIMIT ? OFFSET ?
   `;
-  
   const taskParams = [...queryParams, page_size, offset];
   const taskData = await query<RawTaskData>(taskSql, taskParams);
-  
-  // 如果没有任务数据，直接返回
-  if (taskData.length === 0) {
-    return { tasks: [], total };
-  }
   
   // 第三步：根据任务ID查询对应的文件
   const taskIds = taskData.map(task => task.id);
@@ -233,16 +304,18 @@ export async function getTaskHistory(params: TaskHistoryRequest): Promise<{ task
       gcs_uri,
       preview_url,
       aspect_ratio,
-      create_username as file_create_username,
-      create_time as file_create_time,
-      update_time as file_update_time,
-      del_flag as file_del_flag
+      update_time as file_update_time
     FROM aictr_task_files
     WHERE task_id IN (${taskIds.map(() => '?').join(',')}) AND del_flag = 0
     ORDER BY create_time ASC
   `;
   
   const fileData = await query<RawFileData>(fileSql, taskIds);
+  // 查看preview_url是否过期(通过preview_url中的exp参数) 链接示例：https://storage.googleapis.com/cs-demo-center/admin/task_15/input/person/10__8_.jpg?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=cs-demo-center%40my-project-at-475701.iam.gserviceaccount.com%2F20251029%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20251029T072559Z&X-Goog-Expires=86400&X-Goog-SignedHeaders=host&response-content-disposition=attachment%3B%20filename%3D%2210__8_.jpg%22&X-Goog-Signature=931e3a665335ead2846f4a7bbb4024e36fec7e303bd6b95dabff30731cb6fd6a46070a24f3f99db413d4b283c74675fc96ffb58383ebd72694e8dbac170d3a1c668e55746962117a465a69522ead3fe4eb0060e71747c3e6e15f3db9ba3f23465be8d49a9dfeff4c3d011fdf7a5f81a8a5d86e88a1d11e653d0a867dbb7b675b80e4b14a8f5ccd568452d062182c8f15065850d7600189d6ad625d31619e48162fa9db0f4b41794fe8f0550e8bded80fbdc6c8584f9711c4a3349575ceef6230752fcae775756224d51d807c40e22a30ba8d5cb9d939ddfde0b07b3c74c42de4891fca1fe576b6825cd38e54f48d5cd04a0a7b38970ae3a34fb0a58a0fd4a490
+  //通过X-Goog-Expires参数判断是否过期 应该是UTC时间
+  // 如果过期就用gcs_uri重新生成preview_url 并更新到aictr_task_files
+  // 刷新过期的预览链接，并返回最新的 URL 映射（file_id -> preview_url）
+  const refreshedPreviewMap = await refreshExpiredPreviewUrls(fileData);
   
   // 第四步：组装数据，将文件按任务分组
   const filesByTaskId = new Map<number, TaskFile[]>();
@@ -251,7 +324,6 @@ export async function getTaskHistory(params: TaskHistoryRequest): Promise<{ task
     if (!filesByTaskId.has(file.task_id)) {
       filesByTaskId.set(file.task_id, []);
     }
-    
     const taskFile: TaskFile = {
       id: file.file_id,
       task_id: file.task_id,
@@ -259,14 +331,10 @@ export async function getTaskHistory(params: TaskHistoryRequest): Promise<{ task
       file_name: file.file_name,
       file_mime_type: file.file_mime_type,
       gcs_uri: file.gcs_uri,
-      preview_url: file.preview_url,
+      preview_url: refreshedPreviewMap.get(file.file_id) ?? file.preview_url,
       aspect_ratio: file.aspect_ratio,
-      create_username: file.file_create_username,
-      create_time: file.file_create_time,
       update_time: file.file_update_time,
-      del_flag: file.file_del_flag
     };
-    
     filesByTaskId.get(file.task_id)!.push(taskFile);
   });
   
@@ -276,7 +344,6 @@ export async function getTaskHistory(params: TaskHistoryRequest): Promise<{ task
     
     return {
       id: taskRow.id,
-      project_id: taskRow.project_id,
       username: taskRow.username,
       task_from_tab: taskRow.task_from_tab,
       prompt: taskRow.prompt,
@@ -286,8 +353,6 @@ export async function getTaskHistory(params: TaskHistoryRequest): Promise<{ task
       error_message: taskRow.error_message,
       create_username: taskRow.create_username,
       create_time: taskRow.create_time,
-      update_time: taskRow.update_time,
-      del_flag: taskRow.del_flag,
       input_files: taskFiles.filter(file => file.file_role === FileRole.INPUT),
       output_files: taskFiles.filter(file => file.file_role === FileRole.OUTPUT)
     };

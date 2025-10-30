@@ -22,10 +22,10 @@ export interface TaskFile {
   gcs_uri: string;
   preview_url?: string;
   aspect_ratio: string;
-  create_username: string;
-  create_time: string;
-  update_time: string;
-  del_flag: number;
+  create_username?: string;
+  create_time?: string;
+  update_time?: string;
+  del_flag?: number;
 }
 
 // 生成任务类型
@@ -40,9 +40,9 @@ export interface GenerationTask {
   status: TaskStatus;
   error_message?: string;
   create_username: string;
-  create_time: string;
-  update_time: string;
-  del_flag: number;
+  create_time?: string;
+  update_time?: string;
+  del_flag?: number;
   // 关联的文件
   input_files: TaskFile[];
   output_files: TaskFile[];
